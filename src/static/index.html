@@ -220,52 +220,79 @@
     <!-- MAIN BODY -->
     <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6">
 
-      <!-- TOP METRIC CARDS ROW -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- TOP 5 CORE METRIC CARDS (Requested by Trader) -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5 sm:gap-4">
         
-        <!-- Card 1: Next Action Countdown -->
-        <div class="glass-card rounded-3xl p-5 glow-cyan relative overflow-hidden">
+        <!-- Card 1: MODAL -->
+        <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between">
           <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
-            <span>JADWAL BERIKUTNYA</span>
-            <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px]">AUTO BSJP</span>
+            <span>MODAL</span>
+            <span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 text-[10px] font-mono">POKOK</span>
           </div>
-          <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="nextActionText">15:40 WIB (Beli Sore)</p>
-          <p class="text-xs font-mono text-cyan-400 mt-1" x-text="nextCountdownText">Menghitung waktu...</p>
+          <p class="text-base sm:text-2xl font-black text-white tracking-tight" x-text="formatRupiah(status.stats?.modal || status.settings?.capital_per_strategy || 9000000)">Rp 9.000.000</p>
+          <p class="text-[11px] text-slate-400 mt-1">Alokasi Modal Kerja</p>
         </div>
 
-        <!-- Card 2: Modal Kerja -->
-        <div class="glass-card rounded-3xl p-5 relative overflow-hidden">
+        <!-- Card 2: VALUASI -->
+        <div class="glass-card rounded-3xl p-4 sm:p-5 glow-cyan relative overflow-hidden flex flex-col justify-between">
           <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
-            <span>MODAL ALOKASI STRATEGI</span>
-            <span class="text-[10px] text-slate-500 font-mono">Max 3 Saham</span>
+            <span>VALUASI</span>
+            <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px] font-mono">TOTAL ASET</span>
           </div>
-          <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="formatRupiah(status.settings?.capital_per_strategy || 9000000)">Rp 9.000.000</p>
-          <p class="text-[11px] text-slate-400 mt-1">Rp 3.000.000 / ticker (Diversifikasi)</p>
+          <p class="text-base sm:text-2xl font-black text-cyan-300 tracking-tight" x-text="formatRupiah(status.stats?.valuasi || status.stats?.modal || 9000000)">Rp 9.000.000</p>
+          <p class="text-[11px] text-slate-400 mt-1">Kas + Aset Saham Aktif</p>
         </div>
 
-        <!-- Card 3: Win Rate & Profit -->
-        <div class="glass-card rounded-3xl p-5 glow-emerald relative overflow-hidden">
+        <!-- Card 3: PERSENTASE P/L -->
+        <div class="glass-card rounded-3xl p-4 sm:p-5 glow-emerald relative overflow-hidden flex flex-col justify-between">
           <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
-            <span>PERFORMA STRATEGI</span>
-            <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">WIN RATE</span>
+            <span>PERSENTASE P/L</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                  :class="(status.stats?.pnl_percent || 0) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'"
+                  x-text="(status.stats?.pnl_percent || 0) >= 0 ? 'PROFIT' : 'LOSS'">PROFIT</span>
           </div>
-          <p class="text-lg sm:text-2xl font-extrabold text-emerald-400 tracking-tight" x-text="(status.stats?.win_rate || 0) + '%'">0%</p>
+          <p class="text-base sm:text-2xl font-black tracking-tight"
+             :class="(status.stats?.pnl_percent || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+             x-text="((status.stats?.pnl_percent || 0) >= 0 ? '+' : '') + (status.stats?.pnl_percent || 0) + '%'">0.0%</p>
+          <p class="text-[11px] text-slate-400 mt-1">Imbal Hasil Akumulatif</p>
+        </div>
+
+        <!-- Card 4: NOMINAL P/L -->
+        <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>NOMINAL P/L</span>
+            <span class="px-2 py-0.5 rounded-full text-[10px] font-mono"
+                  :class="(status.stats?.pnl_nominal || 0) >= 0 ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/15 text-rose-400'">NET CUAN</span>
+          </div>
+          <p class="text-base sm:text-2xl font-black tracking-tight"
+             :class="(status.stats?.pnl_nominal || 0) >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+             x-text="((status.stats?.pnl_nominal || 0) >= 0 ? '+' : '') + formatRupiah(status.stats?.pnl_nominal || 0)">Rp 0</p>
+          <p class="text-[11px] text-slate-400 mt-1">Cuan Bersih (Setelah Fee)</p>
+        </div>
+
+        <!-- Card 5: WINRATE -->
+        <div class="glass-card rounded-3xl p-4 sm:p-5 glow-purple relative overflow-hidden flex flex-col justify-between col-span-2 sm:col-span-1">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>WINRATE</span>
+            <span class="px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-300 text-[10px] font-mono">AKURASI</span>
+          </div>
+          <p class="text-base sm:text-2xl font-black text-purple-300 tracking-tight" x-text="(status.stats?.win_rate || 0) + '%'">0%</p>
           <p class="text-[11px] text-slate-400 mt-1" x-text="(status.stats?.win_count || 0) + ' Win / ' + (status.stats?.loss_count || 0) + ' Loss (' + (status.stats?.total_trades || 0) + ' Trade)'">0 Win / 0 Loss</p>
         </div>
 
-        <!-- Card 4: Gemini AI Status -->
-        <div class="glass-card rounded-3xl p-5 glow-purple relative overflow-hidden">
-          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
-            <span>OTAK AI TRADING</span>
-            <span class="w-2.5 h-2.5 rounded-full" :class="status.settings?.gemini_api_key ? 'bg-purple-400 animate-ping' : 'bg-slate-600'"></span>
-          </div>
-          <div class="flex items-baseline gap-2">
-            <span class="text-sm sm:text-base font-bold" :class="status.settings?.gemini_api_key ? 'text-purple-300' : 'text-slate-500'"
-                  x-text="status.settings?.gemini_api_key ? 'AI Reasoning: AKTIF' : 'API Key Belum Diisi'">AI AKTIF</span>
-          </div>
-          <p class="text-[11px] text-slate-400 mt-0.5 font-mono" x-text="status.settings?.gemini_model || 'gemini-3.1-pro'">gemini-3.1-pro</p>
-        </div>
+      </div>
 
+      <!-- Autonomous Zero-Loss Strategy Live Banner -->
+      <div class="p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-slate-900/60 to-cyan-950/40 border border-emerald-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <p class="text-xs text-emerald-200">
+            <span class="font-bold text-white">Mode Fleksibel Multi-Strategi Aktif:</span> Scalping Pagi, Rebound Siang & BSJP Sore — Auto Break-Even Protection (Prinsip Anti-Loss).
+          </p>
+        </div>
+        <div class="flex items-center gap-2 text-xs font-mono text-cyan-300 shrink-0">
+          <span>AI Conviction: <b>MIN 80/100</b></span>
+        </div>
       </div>
 
       <!-- TABS NAVIGATION BAR -->

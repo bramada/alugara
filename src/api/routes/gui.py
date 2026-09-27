@@ -45,11 +45,18 @@ async def get_gui_dashboard_status():
     ai_memories = get_top_ai_memories(limit=15)
     db_settings = get_all_settings()
 
+    # 5 Metrik Utama Portofolio: Modal, Valuasi, Persentase P/L, Nominal P/L, Winrate
+    modal = float(db_settings.get("capital_per_strategy", settings.CAPITAL_PER_STRATEGY))
+    unrealized_pnl = sum((p.get('current_price', p['entry_price']) - p['entry_price']) * p['lots'] * 100 for p in positions)
+    realized_pnl = sum(l['net_profit'] for l in logs)
+    total_pnl = round(realized_pnl + unrealized_pnl, 2)
+    valuasi = round(modal + total_pnl, 2)
+    pnl_percent = round((total_pnl / modal * 100), 2) if modal > 0 else 0.0
+
     win_count = sum(1 for l in logs if l['status'] == 'WIN')
     loss_count = sum(1 for l in logs if l['status'] == 'LOSS')
     total_trades = len(logs)
     win_rate = round((win_count / total_trades * 100), 1) if total_trades > 0 else 0.0
-    total_pnl = sum(l['net_profit'] for l in logs)
 
     # Ambil sinyal screener real-time
     raw_signals = await engine.screener.scan_market_signals()
@@ -68,11 +75,16 @@ async def get_gui_dashboard_status():
             "message": session_msg,
         },
         "stats": {
+            "modal": modal,
+            "valuasi": valuasi,
+            "pnl_nominal": total_pnl,
+            "pnl_percent": pnl_percent,
             "win_rate": win_rate,
             "win_count": win_count,
             "loss_count": loss_count,
             "total_trades": total_trades,
-            "total_pnl": total_pnl,
+            "realized_pnl": realized_pnl,
+            "unrealized_pnl": unrealized_pnl,
             "active_positions_count": len(positions)
         },
         "active_positions": positions,
