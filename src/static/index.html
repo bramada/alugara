@@ -848,6 +848,185 @@
     </main>
   </div>
 
+  <!-- ============================================================== -->
+  <!-- 1. GLOBAL TOAST NOTIFICATION STACK (Z-INDEX 9999)              -->
+  <!-- ============================================================== -->
+  <div class="fixed top-5 right-5 z-[9999] flex flex-col gap-3 max-w-sm sm:max-w-md w-full pointer-events-none p-3 sm:p-0" x-cloak>
+    <template x-for="t in toasts" :key="t.id">
+      <div x-show="t.visible"
+           x-transition:enter="transition ease-out duration-300 transform"
+           x-transition:enter-start="opacity-0 translate-y-[-14px] translate-x-4 scale-95"
+           x-transition:enter-end="opacity-100 translate-y-0 translate-x-0 scale-100"
+           x-transition:leave="transition ease-in duration-200 transform"
+           x-transition:leave-start="opacity-100 translate-x-0 scale-100"
+           x-transition:leave-end="opacity-0 translate-x-8 scale-95"
+           class="pointer-events-auto relative overflow-hidden rounded-2xl border backdrop-blur-2xl shadow-2xl p-4 transition-all duration-200"
+           :class="{
+             'bg-[#0b1329]/95 border-emerald-500/40 shadow-emerald-950/40': t.type === 'success',
+             'bg-[#0b1329]/95 border-rose-500/40 shadow-rose-950/40': t.type === 'error',
+             'bg-[#0b1329]/95 border-amber-500/40 shadow-amber-950/40': t.type === 'warning',
+             'bg-[#0b1329]/95 border-cyan-500/40 shadow-cyan-950/40': t.type === 'info'
+           }">
+        
+        <!-- Glowing Top Accent Line -->
+        <div class="absolute top-0 left-0 right-0 h-[2.5px]"
+             :class="{
+               'bg-gradient-to-r from-emerald-400 via-teal-300 to-transparent': t.type === 'success',
+               'bg-gradient-to-r from-rose-500 via-red-400 to-transparent': t.type === 'error',
+               'bg-gradient-to-r from-amber-400 via-yellow-300 to-transparent': t.type === 'warning',
+               'bg-gradient-to-r from-cyan-400 via-blue-400 to-transparent': t.type === 'info'
+             }"></div>
+
+        <div class="flex items-start gap-3.5">
+          <!-- Icon Badge -->
+          <div class="flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center border shadow-inner"
+               :class="{
+                 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400': t.type === 'success',
+                 'bg-rose-500/15 border-rose-500/30 text-rose-400': t.type === 'error',
+                 'bg-amber-500/15 border-amber-500/30 text-amber-400': t.type === 'warning',
+                 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400': t.type === 'info'
+               }">
+            <!-- Checkmark for Success -->
+            <template x-if="t.type === 'success'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M5 13l4 4L19 7" />
+              </svg>
+            </template>
+            <!-- Exclamation for Error -->
+            <template x-if="t.type === 'error'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </template>
+            <!-- Warning Triangle -->
+            <template x-if="t.type === 'warning'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </template>
+            <!-- Info Icon -->
+            <template x-if="t.type === 'info'">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </template>
+          </div>
+
+          <!-- Content Body -->
+          <div class="flex-1 min-w-0 pr-1">
+            <div class="flex items-center justify-between gap-2">
+              <h4 class="text-sm font-bold tracking-tight text-white" x-text="t.title"></h4>
+              <span class="text-[10px] text-slate-400 font-mono" x-text="t.time"></span>
+            </div>
+            <p class="text-xs text-slate-300 mt-1 leading-relaxed break-words font-medium" x-text="t.message"></p>
+          </div>
+
+          <!-- Close Button -->
+          <button @click="removeToast(t.id)" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800/80 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        <!-- Animated Countdown Progress Bar -->
+        <div class="absolute bottom-0 left-0 right-0 h-1 bg-slate-800/60 overflow-hidden">
+          <div class="h-full transition-all duration-100 ease-linear rounded-full"
+               :style="`width: ${t.progress}%;`"
+               :class="{
+                 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]': t.type === 'success',
+                 'bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]': t.type === 'error',
+                 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]': t.type === 'warning',
+                 'bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.8)]': t.type === 'info'
+               }"></div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- 2. CUSTOM CONFIRMATION MODAL (Z-INDEX 9998)                    -->
+  <!-- ============================================================== -->
+  <div x-show="confirmModal.open"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-[#070b14]/85 backdrop-blur-md"
+       x-cloak>
+    
+    <div @click.away="confirmModal.resolve(false)"
+         x-transition:enter="transition ease-out duration-200 transform"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-3"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150 transform"
+         x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+         x-transition:leave-end="opacity-0 scale-95 translate-y-3"
+         class="relative max-w-md w-full bg-[#0d1527] border border-slate-700/80 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden"
+         :class="{
+           'shadow-cyan-950/50 border-cyan-500/30': confirmModal.type === 'cyan',
+           'shadow-emerald-950/50 border-emerald-500/30': confirmModal.type === 'emerald',
+           'shadow-rose-950/50 border-rose-500/30': confirmModal.type === 'rose'
+         }">
+      
+      <!-- Ambient Glow Orb inside Modal -->
+      <div class="absolute -top-16 -right-16 w-40 h-40 rounded-full blur-2xl pointer-events-none opacity-40"
+           :class="{
+             'bg-cyan-500': confirmModal.type === 'cyan',
+             'bg-emerald-500': confirmModal.type === 'emerald',
+             'bg-rose-500': confirmModal.type === 'rose'
+           }"></div>
+
+      <div class="flex items-start gap-4 mb-5">
+        <div class="w-12 h-12 rounded-2xl flex items-center justify-center border shadow-inner flex-shrink-0"
+             :class="{
+               'bg-cyan-500/15 border-cyan-500/30 text-cyan-400': confirmModal.type === 'cyan',
+               'bg-emerald-500/15 border-emerald-500/30 text-emerald-400': confirmModal.type === 'emerald',
+               'bg-rose-500/15 border-rose-500/30 text-rose-400': confirmModal.type === 'rose'
+             }">
+          <template x-if="confirmModal.type === 'cyan'">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </template>
+          <template x-if="confirmModal.type === 'emerald'">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </template>
+          <template x-if="confirmModal.type === 'rose'">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </template>
+        </div>
+
+        <div class="flex-1 min-w-0">
+          <h3 class="text-base font-bold text-white tracking-tight" x-text="confirmModal.title"></h3>
+          <p class="text-xs text-slate-300 mt-1.5 leading-relaxed font-normal" x-text="confirmModal.message"></p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" @click="confirmModal.resolve(false)"
+                class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all">
+          <span x-text="confirmModal.cancelText"></span>
+        </button>
+        <button type="button" @click="confirmModal.resolve(true)"
+                class="px-5 py-2.5 rounded-xl text-white text-xs font-bold shadow-lg transition-all"
+                :class="{
+                  'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-cyan-500/25': confirmModal.type === 'cyan',
+                  'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-emerald-500/25': confirmModal.type === 'emerald',
+                  'bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-400 hover:to-red-500 shadow-rose-500/25': confirmModal.type === 'rose'
+                }">
+          <span x-text="confirmModal.confirmText"></span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ALPINE JS LOGIC -->
   <script>
     function alugaraApp() {
@@ -967,6 +1146,17 @@
 
         settingsLoaded: false,
 
+        toasts: [],
+        confirmModal: {
+          open: false,
+          title: '',
+          message: '',
+          confirmText: 'Lanjutkan',
+          cancelText: 'Batal',
+          type: 'cyan',
+          resolve: () => {}
+        },
+
         formSettings: {
           trading_pin: '',
           gemini_api_key: '',
@@ -978,7 +1168,79 @@
           telegram_chat_id: '',
         },
 
+        notify(message, type = 'info', title = null, duration = 4500) {
+          if (!title) {
+            if (type === 'success') title = 'Berhasil';
+            else if (type === 'error') title = 'Gagal';
+            else if (type === 'warning') title = 'Perhatian';
+            else title = 'Informasi';
+          }
+          const id = Date.now() + Math.random().toString(36).substr(2, 5);
+          const now = new Date();
+          const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+          
+          const toast = {
+            id,
+            type,
+            title,
+            message: String(message || ''),
+            time,
+            visible: true,
+            progress: 100
+          };
+          
+          this.toasts.unshift(toast);
+          if (this.toasts.length > 5) {
+            this.toasts.pop();
+          }
+
+          const interval = 50;
+          const step = (interval / duration) * 100;
+          const timer = setInterval(() => {
+            toast.progress -= step;
+            if (toast.progress <= 0) {
+              clearInterval(timer);
+              this.removeToast(id);
+            }
+          }, interval);
+        },
+
+        removeToast(id) {
+          const t = this.toasts.find(item => item.id === id);
+          if (t) {
+            t.visible = false;
+            setTimeout(() => {
+              this.toasts = this.toasts.filter(item => item.id !== id);
+            }, 250);
+          }
+        },
+
+        confirmDialog({ title = 'Konfirmasi Tindakan', message = '', confirmText = 'Lanjutkan', cancelText = 'Batal', type = 'cyan' }) {
+          return new Promise((resolve) => {
+            this.confirmModal = {
+              open: true,
+              title,
+              message,
+              confirmText,
+              cancelText,
+              type,
+              resolve: (val) => {
+                this.confirmModal.open = false;
+                resolve(val);
+              }
+            };
+          });
+        },
+
         async initDashboard() {
+          window.__alugara = this;
+          window.alert = (msg) => {
+            const str = String(msg || '');
+            const isErr = (/gagal|error|salah|tidak|invalid/i).test(str);
+            const isSuccess = (/berhasil|sukses|success/i).test(str);
+            const type = isErr ? 'error' : (isSuccess ? 'success' : 'info');
+            this.notify(str, type);
+          };
           this.startClock();
           await this.checkAuthStatus();
           if (this.auth.is_authenticated) {
@@ -1079,7 +1341,14 @@
         },
 
         async handleLogout() {
-          if (!confirm('Keluar dari Dashboard Alugara sekarang?')) return;
+          const confirmed = await this.confirmDialog({
+            title: 'Konfirmasi Logout',
+            message: 'Apakah Anda yakin ingin keluar dari sesi Dashboard Alugara?',
+            confirmText: 'Ya, Logout',
+            cancelText: 'Tetap di Sini',
+            type: 'rose'
+          });
+          if (!confirmed) return;
           try {
             await fetch('/api/v1/auth/logout', { method: 'POST' });
           } catch (e) {
@@ -1087,15 +1356,16 @@
           }
           this.auth.is_authenticated = false;
           this.auth.login_password = '';
+          this.notify('Anda telah berhasil keluar dari sesi.', 'info', 'Logout Berhasil');
         },
 
         async handleChangePassword() {
           if (!this.changePwd.current || !this.changePwd.new_pwd) {
-            alert('Harap isi semua kolom password');
+            this.notify('Harap isi semua kolom password!', 'warning', 'Form Belum Lengkap');
             return;
           }
           if (this.changePwd.new_pwd !== this.changePwd.confirm_pwd) {
-            alert('Konfirmasi password baru tidak cocok');
+            this.notify('Konfirmasi password baru tidak cocok!', 'warning', 'Validasi Gagal');
             return;
           }
           try {
@@ -1110,12 +1380,12 @@
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mengubah password');
-            alert(data.message || 'Password berhasil diubah!');
+            this.notify(data.message || 'Password berhasil diubah!', 'success', 'Password Diperbarui');
             this.changePwd.current = '';
             this.changePwd.new_pwd = '';
             this.changePwd.confirm_pwd = '';
           } catch (e) {
-            alert(e.message);
+            this.notify(e.message || 'Gagal mengubah password', 'error', 'Kesalahan');
           }
         },
 
@@ -1212,10 +1482,14 @@
               return;
             }
             const data = await res.json();
-            alert(data.message || 'Pengaturan berhasil disimpan!');
+            if (data.success !== false) {
+              this.notify(data.message || 'Pengaturan Alugara & Gemini AI berhasil disimpan ke database internal!', 'success', 'Pengaturan Disimpan');
+            } else {
+              this.notify(data.message || 'Gagal menyimpan pengaturan.', 'error', 'Penyimpanan Gagal');
+            }
             await this.fetchStatus();
           } catch (e) {
-            alert('Gagal menyimpan pengaturan: ' + e);
+            this.notify('Gagal menyimpan pengaturan: ' + e, 'error', 'Penyimpanan Error');
           } finally {
             this.saving = false;
           }
@@ -1229,15 +1503,25 @@
               return;
             }
             const data = await res.json();
-            alert(data.message);
+            if (data.success) {
+              this.notify(data.message, 'success', 'Gemini AI Terhubung');
+            } else {
+              this.notify(data.message, 'error', 'Gemini AI Gagal');
+            }
           } catch (e) {
-            alert('Gagal: ' + e);
+            this.notify('Gagal menghubungi API Gemini: ' + e, 'error', 'Koneksi Error');
           }
         },
 
         async triggerBrowserLogin() {
-          const conf = confirm('Buka jendela Google Chrome untuk login ke Stockbit sekarang?');
-          if (!conf) return;
+          const ok = await this.confirmDialog({
+            title: 'Buka Browser Stockbit',
+            message: 'Buka jendela Google Chrome interaktif untuk login ke akun Stockbit Anda sekarang?',
+            confirmText: 'Buka Browser',
+            cancelText: 'Batal',
+            type: 'cyan'
+          });
+          if (!ok) return;
           try {
             const res = await fetch('/api/v1/gui/trigger-login', { method: 'POST' });
             if (res.status === 401) {
@@ -1245,15 +1529,25 @@
               return;
             }
             const data = await res.json();
-            alert(data.message || 'Browser sedang dibuka!');
+            if (data.success) {
+              this.notify(data.message || 'Jendela browser Chrome sedang dibuka!', 'info', 'Stockbit Browser');
+            } else {
+              this.notify(data.message || 'Gagal membuka browser!', 'error', 'Browser Error');
+            }
           } catch (e) {
-            alert('Error: ' + e);
+            this.notify('Error: ' + e, 'error', 'Browser Error');
           }
         },
 
         async triggerBuyNow() {
-          const conf = confirm('Jalankan siklus Intraday Scan & Trade sekarang untuk memindai pasar live?');
-          if (!conf) return;
+          const ok = await this.confirmDialog({
+            title: 'Jalankan Intraday Scan & Trade',
+            message: 'Jalankan siklus pemindaian pasar live BEI dan analisis AI secara instan sekarang?',
+            confirmText: 'Jalankan Scan',
+            cancelText: 'Batal',
+            type: 'emerald'
+          });
+          if (!ok) return;
           try {
             this.executing = true;
             const res = await fetch('/api/v1/gui/trigger-buy', { method: 'POST' });
@@ -1262,18 +1556,28 @@
               return;
             }
             const data = await res.json();
-            alert(data.message);
+            if (data.success) {
+              this.notify(data.message, 'success', 'Intraday Scan Sukses');
+            } else {
+              this.notify(data.message, 'error', 'Intraday Scan Gagal');
+            }
             await this.fetchStatus();
           } catch (e) {
-            alert('Gagal: ' + e);
+            this.notify('Gagal mengeksekusi scan: ' + e, 'error', 'Eksekusi Error');
           } finally {
             this.executing = false;
           }
         },
 
         async triggerSellNow() {
-          const conf = confirm('Jalankan evaluasi Jual Pagi untuk semua posisi aktif sekarang?');
-          if (!conf) return;
+          const ok = await this.confirmDialog({
+            title: 'Jalankan Evaluasi Jual Pagi',
+            message: 'Periksa target TP/SL dan eksekusi jual untuk seluruh posisi portofolio aktif sekarang?',
+            confirmText: 'Eksekusi Jual',
+            cancelText: 'Batal',
+            type: 'rose'
+          });
+          if (!ok) return;
           try {
             this.executing = true;
             const res = await fetch('/api/v1/gui/trigger-sell', { method: 'POST' });
@@ -1282,10 +1586,14 @@
               return;
             }
             const data = await res.json();
-            alert(data.message);
+            if (data.success) {
+              this.notify(data.message, 'success', 'Evaluasi Jual Selesai');
+            } else {
+              this.notify(data.message, 'error', 'Evaluasi Jual Gagal');
+            }
             await this.fetchStatus();
           } catch (e) {
-            alert('Gagal: ' + e);
+            this.notify('Gagal mengeksekusi jual: ' + e, 'error', 'Eksekusi Error');
           } finally {
             this.executing = false;
           }
@@ -1306,10 +1614,14 @@
               return;
             }
             const data = await res.json();
-            alert(data.message);
+            if (data.success) {
+              this.notify(data.message, 'success', 'Telegram Terhubung');
+            } else {
+              this.notify(data.message, 'error', 'Telegram Gagal');
+            }
             // Nilai di input tetap dipertahankan utuh, tidak di-reset!
           } catch (e) {
-            alert('Gagal: ' + e);
+            this.notify('Gagal: ' + e, 'error', 'Uji Coba Gagal');
           }
         }
       }
