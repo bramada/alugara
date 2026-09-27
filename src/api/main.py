@@ -1,10 +1,13 @@
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from loguru import logger
 from src.config.settings import settings
 from src.storage.db import init_db
-from src.api.routes import trade, session
+from src.api.routes import trade, session, gui
 from src.scheduler.market_scheduler import MarketScheduler
 from src.core.execution_engine import ExecutionEngine
 
@@ -22,7 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Alugara - Standalone Automated Stock Trading Engine",
-    description="Engine Automasi Trading Saham Indonesia (IDX) Mandiri & Terpisah 100%",
+    description="Engine Automasi Trading Saham Indonesia (IDX) dengan Web GUI Dashboard",
     version="1.0.0",
     lifespan=lifespan
 )
@@ -35,15 +38,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Static Files for Screenshots & Web GUI
+os.makedirs("screenshots", exist_ok=True)
+os.makedirs("src/static", exist_ok=True)
+app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
+
+# Include Routers
+app.include_router(gui.router)
 app.include_router(trade.router)
 app.include_router(session.router)
 
 @app.get("/")
-async def root():
+async def serve_gui_dashboard():
+    """Menyajikan antarmuka Web Dashboard Alugara"""
+    index_path = os.path.join(os.path.dirname(__file__), "..", "static", "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
     return {
-        "service": "Alugara Standalone Auto-Trading Engine",
+        "service": "Alugara Auto-Trading Engine",
         "status": "ONLINE",
-        "version": "1.0.0",
-        "timezone": settings.MARKET_TIMEZONE,
-        "auto_execute": settings.AUTO_EXECUTE_ENABLED
+        "gui_status": "Template index.html not found"
     }
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy"}

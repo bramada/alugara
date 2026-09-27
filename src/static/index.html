@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alugara — Autonomous Stock Trading Engine</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+          },
+          colors: {
+            darkbg: '#090d16',
+            cardbg: '#0f172a',
+            subcard: '#1e293b',
+            accent: '#3b82f6',
+            accentcyan: '#06b6d4',
+            bullgreen: '#10b981',
+            bearred: '#f43f5e',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; color: #f8fafc; }
+    [x-cloak] { display: none !important; }
+    .glass-card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
+    .glow-cyan { box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25); }
+    .glow-blue { box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.25); }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" x-data="alugaraApp()" x-init="initDashboard()">
+
+  <!-- TOP HEADER NAVBAR -->
+  <header class="sticky top-0 z-50 glass-card border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-cyan-500 to-indigo-600 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-cyan-500/20">
+        🦅
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-extrabold text-lg sm:text-xl tracking-tight text-white">ALUGARA</h1>
+          <span class="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-400 border border-blue-500/30 text-[10px] font-black tracking-widest uppercase">AUTO-BOT v1.0</span>
+        </div>
+        <p class="text-xs text-slate-400">Autonomous Trading Engine for IDX & Stockbit</p>
+      </div>
+    </div>
+
+    <!-- Right Header: Status & Live Clock -->
+    <div class="flex items-center gap-3">
+      <!-- Session Badge -->
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold"
+           :class="status.session?.is_authenticated ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'">
+        <span class="w-2 h-2 rounded-full animate-pulse" :class="status.session?.is_authenticated ? 'bg-emerald-400' : 'bg-rose-400'"></span>
+        <span x-text="status.session?.is_authenticated ? 'Stockbit Terhubung' : 'Belum Login'"></span>
+      </div>
+
+      <!-- Live Clock WIB -->
+      <div class="px-3 py-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs font-mono font-bold text-cyan-300">
+        <span x-text="currentTimeWIB">--:--:-- WIB</span>
+      </div>
+
+      <!-- Refresh Button -->
+      <button @click="fetchStatus()" :disabled="loading" class="p-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all active:scale-95">
+        <svg class="w-4 h-4" :class="loading ? 'animate-spin text-cyan-400' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+
+    <!-- 1. TOP STATS OVERVIEW CARDS -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      
+      <!-- Card 1: Next Window Countdown -->
+      <div class="glass-card rounded-3xl p-4 sm:p-5 glow-cyan relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+          <span>Jadwal Bursa Berikutnya</span>
+          <span class="text-cyan-400">⏰</span>
+        </div>
+        <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="nextActionText">15:40 WIB</p>
+        <p class="text-[11px] text-cyan-300 mt-1 font-medium" x-text="nextCountdownText">Sisa Waktu: Menghitung...</p>
+      </div>
+
+      <!-- Card 2: Modal per Strategi -->
+      <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+          <span>Modal per Strategi</span>
+          <span class="text-blue-400">💼</span>
+        </div>
+        <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="formatRupiah(status.settings?.capital_per_strategy || 9000000)">Rp 9.000.000</p>
+        <p class="text-[11px] text-slate-400 mt-1">Dibagi rata ke 3 emiten</p>
+      </div>
+
+      <!-- Card 3: Win Rate Realisasi -->
+      <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
+          <span>Win Rate Bot</span>
+          <span class="text-emerald-400">🎯</span>
+        </div>
+        <p class="text-lg sm:text-2xl font-extrabold text-emerald-400 tracking-tight" x-text="(status.stats?.win_rate || 0) + '%'">0%</p>
+        <p class="text-[11px] text-slate-400 mt-1" x-text="(status.stats?.win_count || 0) + ' Win / ' + (status.stats?.loss_count || 0) + ' Loss (' + (status.stats?.total_trades || 0) + ' Trade)'">0 Win / 0 Loss</p>
+      </div>
+
+      <!-- Card 4: Bot Autopilot Switch -->
+      <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden flex flex-col justify-between">
+        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold">
+          <span>Auto-Pilot Trading</span>
+          <span class="w-2.5 h-2.5 rounded-full" :class="status.settings?.auto_execute_enabled ? 'bg-emerald-400 animate-ping' : 'bg-slate-600'"></span>
+        </div>
+        <div class="flex items-center justify-between mt-2">
+          <span class="text-sm sm:text-base font-bold" :class="status.settings?.auto_execute_enabled ? 'text-emerald-400' : 'text-slate-400'"
+                x-text="status.settings?.auto_execute_enabled ? 'AKTIF (ON)' : 'NONAKTIF (OFF)'">AKTIF</span>
+          <button @click="toggleAutoPilot()" 
+                  class="px-3 py-1 rounded-xl text-xs font-bold transition-all"
+                  :class="status.settings?.auto_execute_enabled ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'">
+            <span x-text="status.settings?.auto_execute_enabled ? 'Matikan' : 'Aktifkan'"></span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 2. NAVIGATION TABS -->
+    <div class="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
+      <button @click="activeTab = 'screener'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
+              :class="activeTab === 'screener' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
+        📡 Screener Sinyal Hari Ini
+      </button>
+      <button @click="activeTab = 'positions'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
+              :class="activeTab === 'positions' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
+        💼 Posisi Aktif (<span x-text="status.active_positions?.length || 0">0</span>)
+      </button>
+      <button @click="activeTab = 'history'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
+              :class="activeTab === 'history' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
+        📜 Histori & Bukti Order
+      </button>
+      <button @click="activeTab = 'settings'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
+              :class="activeTab === 'settings' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
+        ⚙️ Pengaturan (Settings)
+      </button>
+    </div>
+
+    <!-- 3. TAB 1: SCREENER & SIGNAL RADAR -->
+    <div x-show="activeTab === 'screener'" class="space-y-4" x-cloak>
+      <div class="glass-card rounded-3xl p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+              <span>⚡ Rekomendasi Saham Screener Internal</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Memindai momentum breakout likuid BEI untuk dieksekusi otomatis pada 15:40 WIB.</p>
+          </div>
+          <button @click="triggerBuyNow()" :disabled="executing" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50">
+            <span>🚀 Eksekusi Beli Sekarang (Manual)</span>
+          </button>
+        </div>
+
+        <!-- Table Screener -->
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-800/80">
+                <th class="py-3 px-3">EMITEN</th>
+                <th class="py-3 px-3">HARGA LIVE</th>
+                <th class="py-3 px-3">PERUBAHAN</th>
+                <th class="py-3 px-3">ALOKASI LOT</th>
+                <th class="py-3 px-3">TARGET PROFIT (TP)</th>
+                <th class="py-3 px-3">STOP LOSS (SL)</th>
+                <th class="py-3 px-3">STRATEGI</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <template x-for="sig in status.screener_signals" :key="sig.ticker">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="py-3.5 px-3">
+                    <span class="font-extrabold text-white text-sm" x-text="sig.ticker"></span>
+                  </td>
+                  <td class="py-3.5 px-3 font-mono font-bold text-white" x-text="'Rp ' + (sig.current_price || 0).toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 font-mono font-bold text-emerald-400">+3.2%</td>
+                  <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-mono font-bold"
+                          x-text="calculateLots(sig.current_price) + ' Lot'"></span>
+                  </td>
+                  <td class="py-3.5 px-3 font-mono text-emerald-400 font-bold" x-text="'Rp ' + (sig.target_price_1 || 0).toLocaleString('id-ID') + ' (+3%)'"></td>
+                  <td class="py-3.5 px-3 font-mono text-rose-400 font-bold" x-text="'Rp ' + (sig.stop_loss_price || 0).toLocaleString('id-ID') + ' (-2.5%)'"></td>
+                  <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold" x-text="sig.strategy_name"></span>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="!status.screener_signals || status.screener_signals.length === 0">
+                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Memuat kandidat sinyal saham bursa...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. TAB 2: ACTIVE POSITIONS -->
+    <div x-show="activeTab === 'positions'" class="space-y-4" x-cloak>
+      <div class="glass-card rounded-3xl p-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
+          <div>
+            <h2 class="text-base sm:text-lg font-bold text-white">💼 Posisi Saham Aktif Alugara</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Daftar saham yang sedang di-hold di database internal Alugara.</p>
+          </div>
+          <button @click="triggerSellNow()" :disabled="executing" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 disabled:opacity-50">
+            <span>🎯 Realisasi Jual Semua (Manual)</span>
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-800/80">
+                <th class="py-3 px-3">EMITEN</th>
+                <th class="py-3 px-3">JUMLAH LOT</th>
+                <th class="py-3 px-3">HARGA BELI</th>
+                <th class="py-3 px-3">MODAL MASUK</th>
+                <th class="py-3 px-3">TARGET TP</th>
+                <th class="py-3 px-3">WAKTU ENTRY</th>
+                <th class="py-3 px-3">STATUS</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <template x-for="pos in status.active_positions" :key="pos.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="py-3.5 px-3 font-extrabold text-white text-sm" x-text="pos.ticker"></td>
+                  <td class="py-3.5 px-3 font-mono font-bold text-cyan-300" x-text="pos.lots + ' Lot'"></td>
+                  <td class="py-3.5 px-3 font-mono" x-text="'Rp ' + pos.entry_price.toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 font-mono font-bold text-white" x-text="'Rp ' + pos.invested_amount.toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 font-mono text-emerald-400" x-text="'Rp ' + (pos.target_price_1 || 0).toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 text-slate-400" x-text="pos.entry_date"></td>
+                  <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">HOLDING</span>
+                  </td>
+                </tr>
+              </template>
+              <tr x-show="!status.active_positions || status.active_positions.length === 0">
+                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Belum ada posisi saham yang sedang di-hold. Bot akan beli saat jam 15:40 WIB.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. TAB 3: TRADE HISTORY & SCREENSHOTS -->
+    <div x-show="activeTab === 'history'" class="space-y-4" x-cloak>
+      <div class="glass-card rounded-3xl p-5">
+        <h2 class="text-base sm:text-lg font-bold text-white mb-1">📜 Histori Transaksi Selesai & Bukti Order</h2>
+        <p class="text-xs text-slate-400 mb-4">Catatan seluruh transaksi yang telah dieksekusi Alugara.</p>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-800/80">
+                <th class="py-3 px-3">EMITEN</th>
+                <th class="py-3 px-3">HASIL</th>
+                <th class="py-3 px-3">CUAN (%)</th>
+                <th class="py-3 px-3">LABA BERSIH (Rp)</th>
+                <th class="py-3 px-3">HARGA BELI -> JUAL</th>
+                <th class="py-3 px-3">ALASAN EXIT</th>
+                <th class="py-3 px-3">TANGGAL</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/60">
+              <template x-for="log in status.recent_trades" :key="log.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="py-3.5 px-3 font-extrabold text-white" x-text="log.ticker"></td>
+                  <td class="py-3.5 px-3">
+                    <span class="px-2 py-0.5 rounded font-black text-[10px]"
+                          :class="log.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
+                          x-text="log.status"></span>
+                  </td>
+                  <td class="py-3.5 px-3 font-mono font-bold"
+                      :class="log.profit_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                      x-text="(log.profit_percent > 0 ? '+' : '') + log.profit_percent.toFixed(2) + '%'"></td>
+                  <td class="py-3.5 px-3 font-mono font-bold"
+                      :class="log.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                      x-text="'Rp ' + log.net_profit.toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 font-mono text-slate-300" x-text="'Rp ' + log.entry_price.toLocaleString('id-ID') + ' -> Rp ' + log.exit_price.toLocaleString('id-ID')"></td>
+                  <td class="py-3.5 px-3 text-slate-400" x-text="log.exit_reason"></td>
+                  <td class="py-3.5 px-3 text-slate-400" x-text="log.exit_date"></td>
+                </tr>
+              </template>
+              <tr x-show="!status.recent_trades || status.recent_trades.length === 0">
+                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Belum ada riwayat transaksi selesai.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. TAB 4: SETTINGS (ZERO .ENV NEEDED) -->
+    <div x-show="activeTab === 'settings'" class="space-y-6" x-cloak>
+      <div class="glass-card rounded-3xl p-6 max-w-3xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-lg font-bold text-white">⚙️ Pengaturan Alugara (Simpan Langsung ke Database)</h2>
+          <p class="text-xs text-slate-400 mt-1">Anda tidak perlu lagi mengedit file teks <code class="text-cyan-400">.env</code>. Cukup atur parameter di bawah ini.</p>
+        </div>
+
+        <!-- Section 1: Stockbit PIN & Login -->
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <h3 class="text-sm font-bold text-cyan-400">1. Akun & Keamanan Stockbit</h3>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">PIN Trading Stockbit (6 Digit)</label>
+              <input type="password" x-model="formSettings.trading_pin" placeholder="Masukkan 6 Digit PIN"
+                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400">
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pairing Login Sesi</label>
+              <button @click="triggerBrowserLogin()" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2">
+                <span>🔑 Hubungkan / Login Stockbit</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Modal & Risk -->
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <h3 class="text-sm font-bold text-cyan-400">2. Manajemen Modal & Risiko</h3>
+          
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Total Modal yang Dialokasikan (Rp)</label>
+            <input type="number" x-model.number="formSettings.capital_per_strategy" placeholder="9000000"
+                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+            <p class="text-[11px] text-slate-400 mt-1">Modal ini otomatis dibagi rata ke 3 saham terbaik sore hari (Rp 3.000.000/saham).</p>
+          </div>
+        </div>
+
+        <!-- Section 3: Telegram Bot -->
+        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-cyan-400">3. Notifikasi Bot Telegram</h3>
+            <label class="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
+              <input type="checkbox" x-model="formSettings.telegram_enabled" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+              <span>Aktifkan Telegram</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Bot Token</label>
+              <input type="text" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
+                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Chat ID</label>
+              <input type="text" x-model="formSettings.telegram_chat_id" placeholder="987654321"
+                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+            </div>
+          </div>
+
+          <button @click="testTelegram()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 text-xs font-bold transition-all">
+            💬 Uji Coba Kirim Pesan Telegram
+          </button>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="flex justify-end pt-2">
+          <button @click="saveSettings()" :disabled="saving" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 via-cyan-500 to-indigo-600 hover:opacity-90 text-white font-bold text-sm shadow-xl shadow-cyan-500/25 active:scale-95 transition-all disabled:opacity-50">
+            <span x-text="saving ? 'Menyimpan...' : '💾 Simpan Semua Pengaturan'"></span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- ALPINE JS LOGIC -->
+  <script>
+    function alugaraApp() {
+      return {
+        activeTab: 'screener',
+        loading: false,
+        executing: false,
+        saving: false,
+        currentTimeWIB: '',
+        nextActionText: '15:40 WIB (Beli Sore)',
+        nextCountdownText: 'Menghitung waktu...',
+        status: {
+          session: {},
+          stats: {},
+          active_positions: [],
+          recent_trades: [],
+          screener_signals: [],
+          settings: {}
+        },
+        formSettings: {
+          trading_pin: '',
+          capital_per_strategy: 9000000,
+          telegram_enabled: false,
+          telegram_bot_token: '',
+          telegram_chat_id: '',
+        },
+
+        initDashboard() {
+          this.startClock();
+          this.fetchStatus();
+          setInterval(() => this.fetchStatus(), 15000); // Polling status setiap 15 detik
+        },
+
+        startClock() {
+          setInterval(() => {
+            const now = new Date();
+            const formatter = new Intl.DateTimeFormat('id-ID', {
+              timeZone: 'Asia/Jakarta',
+              hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            });
+            this.currentTimeWIB = formatter.format(now) + ' WIB';
+            this.calculateCountdown(now);
+          }, 1000);
+        },
+
+        calculateCountdown(now) {
+          const jkt = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" }));
+          const h = jkt.getHours();
+          const m = jkt.getMinutes();
+          const s = jkt.getSeconds();
+          const totalSecNow = h * 3600 + m * 60 + s;
+
+          const buySec = 15 * 3600 + 40 * 60; // 15:40
+          const sellSec = 9 * 3600 + 10 * 60;  // 09:10
+
+          if (totalSecNow < sellSec) {
+            const diff = sellSec - totalSecNow;
+            this.nextActionText = '09:10 WIB (Jual Pagi)';
+            this.nextCountdownText = `Sisa Waktu: ${Math.floor(diff/3600)}j ${Math.floor((diff%3600)/60)}m ${diff%60}s`;
+          } else if (totalSecNow < buySec) {
+            const diff = buySec - totalSecNow;
+            this.nextActionText = '15:40 WIB (Beli Sore)';
+            this.nextCountdownText = `Sisa Waktu: ${Math.floor(diff/3600)}j ${Math.floor((diff%3600)/60)}m ${diff%60}s`;
+          } else {
+            this.nextActionText = '09:10 WIB (Besok Pagi)';
+            this.nextCountdownText = 'Pasar Tutup (Standby untuk Pagi)';
+          }
+        },
+
+        async fetchStatus() {
+          try {
+            this.loading = true;
+            const res = await fetch('/api/v1/gui/status');
+            const data = await res.json();
+            if (data.success) {
+              this.status = data;
+              this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
+              this.formSettings.telegram_enabled = data.settings.telegram_enabled || false;
+              this.formSettings.telegram_bot_token = data.settings.telegram_bot_token || '';
+              this.formSettings.telegram_chat_id = data.settings.telegram_chat_id || '';
+            }
+          } catch (e) {
+            console.error(e);
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        calculateLots(price) {
+          if (!price || price <= 0) return 1;
+          const cap = (this.status.settings?.capital_per_strategy || 9000000) / 3;
+          const lots = Math.floor((cap / price) / 100);
+          return Math.max(1, lots);
+        },
+
+        formatRupiah(val) {
+          return 'Rp ' + (val || 0).toLocaleString('id-ID');
+        },
+
+        async saveSettings() {
+          try {
+            this.saving = true;
+            const res = await fetch('/api/v1/gui/settings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(this.formSettings)
+            });
+            const data = await res.json();
+            alert(data.message || 'Pengaturan berhasil disimpan!');
+            await this.fetchStatus();
+          } catch (e) {
+            alert('Gagal menyimpan pengaturan: ' + e);
+          } finally {
+            this.saving = false;
+          }
+        },
+
+        async toggleAutoPilot() {
+          const current = this.status.settings?.auto_execute_enabled;
+          const next = !current;
+          await fetch('/api/v1/gui/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ auto_execute_enabled: next })
+          });
+          await this.fetchStatus();
+        },
+
+        async triggerBrowserLogin() {
+          const conf = confirm('Apakah Anda ingin membuka jendela browser Google Chrome untuk login ke Stockbit sekarang?');
+          if (!conf) return;
+          try {
+            const res = await fetch('/api/v1/gui/trigger-login', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message || 'Browser sedang dibuka!');
+          } catch (e) {
+            alert('Error: ' + e);
+          }
+        },
+
+        async triggerBuyNow() {
+          const conf = confirm('Jalankan eksekusi Beli Sore (BSJP) sekarang untuk rekomendasi saham hari ini?');
+          if (!conf) return;
+          try {
+            this.executing = true;
+            const res = await fetch('/api/v1/gui/trigger-buy', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message);
+            await this.fetchStatus();
+          } catch (e) {
+            alert('Gagal: ' + e);
+          } finally {
+            this.executing = false;
+          }
+        },
+
+        async triggerSellNow() {
+          const conf = confirm('Jalankan evaluasi Jual Pagi (Realisasi Profit/Loss) untuk semua posisi aktif sekarang?');
+          if (!conf) return;
+          try {
+            this.executing = true;
+            const res = await fetch('/api/v1/gui/trigger-sell', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message);
+            await this.fetchStatus();
+          } catch (e) {
+            alert('Gagal: ' + e);
+          } finally {
+            this.executing = false;
+          }
+        },
+
+        async testTelegram() {
+          try {
+            const res = await fetch('/api/v1/gui/test-telegram', { method: 'POST' });
+            const data = await res.json();
+            alert(data.message);
+          } catch (e) {
+            alert('Gagal: ' + e);
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>

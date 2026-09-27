@@ -62,10 +62,47 @@ def init_db():
     )
     """)
 
+    # Table 3: Persistent App Settings (Zero .env Needed)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL,
+        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     conn.commit()
     conn.close()
 
-# Helper CRUD
+# App Settings Helpers
+def get_setting(key: str, default: Optional[str] = None) -> Optional[str]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM app_settings WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    return row['value'] if row else default
+
+def set_setting(key: str, value: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    INSERT INTO app_settings (key, value, updated_at) 
+    VALUES (?, ?, CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+    """, (key, str(value)))
+    conn.commit()
+    conn.close()
+
+def get_all_settings() -> Dict[str, str]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT key, value FROM app_settings")
+    rows = cursor.fetchall()
+    conn.close()
+    return {r['key']: r['value'] for r in rows}
+
+# CRUD Active Positions
 def save_active_position(pos: Dict[str, Any]) -> int:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -98,9 +135,7 @@ def get_active_positions() -> List[Dict[str, Any]]:
 def close_position_to_trade_log(position_id: int, log_data: Dict[str, Any]):
     conn = get_db_connection()
     cursor = conn.cursor()
-    # 1. Update position status to CLOSED
     cursor.execute("UPDATE active_positions SET status = 'CLOSED' WHERE id = ?", (position_id,))
-    # 2. Insert into trade_logs
     cursor.execute("""
     INSERT INTO trade_logs (
         ticker, strategy_name, action, entry_price, exit_price,
