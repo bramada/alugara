@@ -61,11 +61,13 @@ class StrategyScreener:
             reverse=True
         )
 
-        # Ambil top 3 emiten terbaik
-        top_3 = sorted_candidates[:3] if len(sorted_candidates) >= 3 else valid_quotes[:3]
+        # Bebas tanpa batasan kaku: loloskan semua kandidat yang memenuhi kriteria momentum positif ke AI
+        selected_candidates = sorted_candidates if sorted_candidates else [q for q in valid_quotes if q["change_percent"] > 0]
+        if not selected_candidates:
+            selected_candidates = valid_quotes
 
         signals = []
-        for item in top_3:
+        for item in selected_candidates:
             p = item["price"]
             # Target TP +3.0%, Stop Loss -2.5%
             tp1 = int(round(p * 1.03))

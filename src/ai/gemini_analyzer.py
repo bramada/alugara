@@ -71,14 +71,14 @@ class GeminiAnalyzer:
         """
         FASE 1 (Pre-Trade AI Gatekeeper):
         Menganalisis daftar kandidat saham sore hari, menyaring jebakan bandar,
-        memberi skor keyakinan AI (1-100), dan memilih top 3 saham terkuat.
+        memberi skor keyakinan AI (1-100), dan memilih saham-saham yang benar-benar layak tanpa batasan kuota kaku.
         """
         if not candidates:
             return []
 
         if not self.is_enabled():
-            logger.info("Gemini AI reasoning nonaktif/tanpa API Key. Menggunakan ranking teknikal standar.")
-            return candidates[:3]
+            logger.info("Gemini AI reasoning nonaktif/tanpa API Key. Menggunakan ranking teknikal standar tanpa batasan kuota.")
+            return candidates
 
         # 1. Ambil Buku Pintar Memori Masa Lalu (RAG Memory Context)
         past_memories = get_top_ai_memories(limit=8)
@@ -92,7 +92,13 @@ class GeminiAnalyzer:
 Anda adalah Senior Quantitative Trader & Risk Officer di Bursa Efek Indonesia (IDX) untuk strategi BSJP (Beli Sore Jual Pagi).
 
 Tugas Anda:
-Analisis kandidat saham sore hari berikut ini (jam 15:35 WIB) untuk disaring menjadi TOP 3 SAHAM TERBAIK yang paling berpotensi naik 2% - 5% di pembukaan pasar besok pagi.
+Analisis kandidat saham sore hari berikut ini (jam 15:35 WIB) secara mandiri dan komprehensif.
+Pilihlah saham-saham yang BENAR-BENAR LAYAK dan berprobabilitas tinggi untuk naik 2% - 5% di pembukaan pasar besok pagi.
+
+ATURAN PENTING JUMLAH SAHAM:
+- JANGAN MEMBATASI JUMLAH SAHAM. Jumlah saham yang Anda rekomendasikan BEBAS (bisa 1, 2, 3, 4, 5, atau lebih) sesuai murni hasil analisa teknikal, bandarmologi, dan manajemen risiko Anda.
+- Jika ada banyak saham yang memenuhi syarat dan aman dari jebakan bandar, pilih semuanya.
+- Jika hanya sedikit atau bahkan hanya 1 yang benar-benar bagus, pilih yang bagus saja. Prioritas mutlak adalah profit konsisten tanpa risiko tinggi.
 
 {memory_context}
 
@@ -103,7 +109,8 @@ INSTRUKSI ANALISIS:
 1. Periksa momentum kenaikan harga, kestabilan tick harga, dan potensi fake breakout.
 2. Berikan 'ai_score' (1 - 100) untuk setiap saham.
 3. Berikan 'ai_reasoning' singkat (maksimal 2 kalimat) dalam Bahasa Indonesia.
-4. Urutkan dan pilih HANYA 3 SAHAM TERBAIK dengan skor tertinggi.
+3. Hanya masukkan saham yang memiliki skor keyakinan tinggi (ai_score >= 75) ke dalam rekomendasi final.
+4. Urutkan dari ai_score tertinggi ke terendah tanpa membatasi jumlah rekomendasi.
 
 Kembalikan HANYA format JSON murni array of objects tanpa markdown:
 [
@@ -141,7 +148,7 @@ Kembalikan HANYA format JSON murni array of objects tanpa markdown:
             except Exception as e:
                 logger.error(f"Gagal mem-parsing JSON Gemini AI: {e}. Menggunakan ranking cadangan.")
 
-        return candidates[:3]
+        return candidates
 
     async def reflect_on_closed_trade(self, trade_data: Dict[str, Any]):
         """
