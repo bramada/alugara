@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Gemini AI
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-3.1-pro"
+    GEMINI_MODEL: str = "gemini-3.7-flash"
     AI_REASONING_ENABLED: bool = True
 
     # Browser

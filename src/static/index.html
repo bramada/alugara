@@ -905,7 +905,7 @@
         formSettings: {
           trading_pin: '',
           gemini_api_key: '',
-          gemini_model: 'gemini-3.1-pro',
+          gemini_model: 'gemini-3.7-flash',
           ai_reasoning_enabled: true,
           capital_per_strategy: 9000000,
           telegram_enabled: false,
@@ -1102,7 +1102,7 @@
             if (data.success) {
               this.status = data;
               this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
-              this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-3.1-pro';
+              this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-3.7-flash';
               this.formSettings.ai_reasoning_enabled = data.settings.ai_reasoning_enabled ?? true;
               this.formSettings.telegram_enabled = data.settings.telegram_enabled || false;
               this.formSettings.telegram_bot_token = data.settings.telegram_bot_token || '';

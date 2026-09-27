@@ -23,7 +23,7 @@ class GeminiAnalyzer:
         return get_setting("gemini_api_key") or settings.GEMINI_API_KEY or ""
 
     def get_model(self) -> str:
-        return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-1.5-flash"
+        return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-3.7-flash"
 
     def is_enabled(self) -> bool:
         enabled_setting = get_setting("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED))
