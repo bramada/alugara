@@ -757,8 +757,68 @@
             </div>
 
             <button @click="testGemini()" class="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold transition-all">
-              🧠 Uji Coba Koneksi Gemini AI
+              ⚡ Uji Coba Koneksi Gemini AI
             </button>
+
+            <!-- GEMINI QUOTA & RATE LIMIT MONITOR (Antigravity Style) -->
+            <div class="mt-4 pt-4 border-t border-purple-500/20 space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <h4 class="text-xs font-bold text-slate-200 tracking-wide flex items-center gap-1.5">
+                    <span>Gemini Models</span>
+                    <span class="text-slate-400 hover:text-slate-200 cursor-pointer text-xs" title="Monitoring real-time kuota Google AI Studio: 1,500 RPD harian & 15 RPM per-menit.">ⓘ</span>
+                  </h4>
+                </div>
+                <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span x-text="status.gemini_quota ? status.gemini_quota.status_text : 'Optimal (100%)'"></span>
+                </span>
+              </div>
+
+              <div class="space-y-2.5">
+                <!-- Card 1: Batas Kuota Harian (Daily Limit Remaining) -->
+                <div class="p-3.5 rounded-2xl bg-[#080d18] border border-slate-800/90 hover:border-purple-500/40 flex items-center justify-between gap-4 transition-all">
+                  <div class="space-y-1 flex-1 min-w-0">
+                    <div class="text-xs font-semibold text-slate-200">Weekly Limit Remaining (Daily RPD 1,500)</div>
+                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.daily_subtext : 'Terpakai 0 dari 1,500 request harian. Akan refresh penuh dalam 15 jam, 05 menit.'"></p>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.daily_remaining_pct + '%') : '100%'"></span>
+                    <!-- Circular Progress Ring -->
+                    <div class="relative w-8 h-8 flex items-center justify-center">
+                      <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="text-emerald-400 transition-all duration-500"
+                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.daily_remaining_pct : 100}, 100`"
+                              stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 2: Batas Rate Limit Menit (Per-Minute RPM Remaining) -->
+                <div class="p-3.5 rounded-2xl bg-[#080d18] border border-slate-800/90 hover:border-purple-500/40 flex items-center justify-between gap-4 transition-all">
+                  <div class="space-y-1 flex-1 min-w-0">
+                    <div class="text-xs font-semibold text-slate-200">Rate Limit Remaining (15 RPM)</div>
+                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.rpm_subtext : '0 dari 15 RPM terpakai. Rolling window 60 detik siap melayani.'"></p>
+                  </div>
+                  <div class="flex items-center gap-3 flex-shrink-0">
+                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.rpm_remaining_pct + '%') : '100%'"></span>
+                    <!-- Circular Progress Ring -->
+                    <div class="relative w-8 h-8 flex items-center justify-center">
+                      <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+                        <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                        <path class="text-emerald-400 transition-all duration-500"
+                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.rpm_remaining_pct : 100}, 100`"
+                              stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
+                              d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Section 2: Stockbit PIN & Login -->
@@ -1229,6 +1289,19 @@
           recent_trades: [],
           ai_memories: [],
           screener_signals: [],
+          gemini_quota: {
+            daily_used: 0,
+            daily_max: 1500,
+            daily_remaining: 1500,
+            daily_remaining_pct: 100,
+            daily_subtext: 'Terpakai 0 dari 1,500 request harian. Refresh penuh dalam 15 jam.',
+            rpm_used: 0,
+            rpm_max: 15,
+            rpm_remaining_pct: 100,
+            rpm_subtext: '0 dari 15 RPM terpakai. Rolling window 60 detik siap melayani.',
+            reset_in: '15 jam',
+            status_text: 'Optimal (100%)'
+          },
           settings: {}
         },
 
