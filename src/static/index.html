@@ -1284,13 +1284,23 @@
 
         async testTelegram() {
           try {
-            const res = await fetch('/api/v1/gui/test-telegram', { method: 'POST' });
+            const res = await fetch('/api/v1/gui/test-telegram', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                bot_token: this.formSettings.telegram_bot_token,
+                chat_id: this.formSettings.telegram_chat_id
+              })
+            });
             if (res.status === 401) {
               this.auth.is_authenticated = false;
               return;
             }
             const data = await res.json();
             alert(data.message);
+            if (data.success) {
+              await this.fetchStatus();
+            }
           } catch (e) {
             alert('Gagal: ' + e);
           }

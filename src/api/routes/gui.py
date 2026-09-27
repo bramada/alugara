@@ -183,7 +183,50 @@ async def trigger_manual_sell():
     await engine.run_morning_auto_sell()
     return {"success": True, "message": "Rutinitas evaluasi Jual Pagi berhasil dijalankan."}
 
+class TestTelegramPayload(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+
 @router.post("/test-telegram")
-async def test_telegram_connection():
-    res = await notifier.send_message("🚀 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung!")
-    return {"success": res, "message": "Pesan berhasil dikirim ke Telegram!" if res else "Gagal mengirim. Cek Token & Chat ID."}
+async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None):
+    token_input = payload.bot_token.strip() if payload and payload.bot_token and payload.bot_token != "****" else None
+    chat_input = payload.chat_id.strip() if payload and payload.chat_id and payload.chat_id != "****" else None
+
+    # Jika user menginput nilai baru, simpan langsung ke database internal
+    if token_input:
+        set_setting("telegram_bot_token", encrypt_value(token_input))
+        settings.TELEGRAM_BOT_TOKEN = token_input
+    if chat_input:
+        set_setting("telegram_chat_id", encrypt_value(chat_input))
+        settings.TELEGRAM_CHAT_ID = chat_input
+    set_setting("telegram_enabled", "True")
+    settings.TELEGRAM_ENABLED = True
+
+    enabled, token, chat = notifier.get_credentials()
+    active_token = token_input or token
+    active_chat = chat_input or chat
+
+    if not active_token or not active_chat:
+        return {
+            "success": False,
+            "message": "Token atau Chat ID belum terisi. Harap masukkan Bot Token dan Chat ID!"
+        }
+
+    url = f"https://api.telegram.org/bot{active_token}/sendMessage"
+    payload_data = {
+        "chat_id": active_chat,
+        "text": "🚀 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung ke Channel/Group!",
+        "parse_mode": "HTML"
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(url, json=payload_data)
+            if res.status_code == 200:
+                return {"success": True, "message": "✅ Pesan uji coba berhasil terkirim ke Telegram!"}
+            else:
+                data = res.json()
+                err_desc = data.get("description", res.text)
+                return {"success": False, "message": f"❌ Gagal mengirim ke Telegram: {err_desc}"}
+    except Exception as e:
+        return {"success": False, "message": f"❌ Error koneksi: {e}"}

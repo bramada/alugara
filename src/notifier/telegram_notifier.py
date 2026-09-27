@@ -1,26 +1,48 @@
 import os
 import httpx
+from typing import Optional, Tuple
 from loguru import logger
 from src.config.settings import settings
 from src.core.models import OrderResult
 
 class TelegramNotifier:
     """
-    Layanan Pengirim Notifikasi Telegram Bot
+    Layanan Pengirim Notifikasi Telegram Bot (Dinamis dari SQLite & Enkripsi AES-256)
     """
     def __init__(self):
-        self.enabled = settings.TELEGRAM_ENABLED
-        self.bot_token = settings.TELEGRAM_BOT_TOKEN
-        self.chat_id = settings.TELEGRAM_CHAT_ID
+        pass
 
-    async def send_message(self, message: str) -> bool:
-        if not self.enabled or not self.bot_token or not self.chat_id:
-            logger.debug("Telegram notifications disabled or credentials missing.")
+    def get_credentials(self) -> Tuple[bool, str, str]:
+        from src.storage.db import get_setting
+        from src.core.security import decrypt_value
+
+        db_enabled = get_setting("telegram_enabled")
+        enabled = (db_enabled.lower() == "true") if db_enabled else settings.TELEGRAM_ENABLED
+
+        stored_token = get_setting("telegram_bot_token")
+        bot_token = decrypt_value(stored_token) if stored_token else settings.TELEGRAM_BOT_TOKEN
+
+        stored_chat = get_setting("telegram_chat_id")
+        chat_id = decrypt_value(stored_chat) if stored_chat else settings.TELEGRAM_CHAT_ID
+
+        return enabled, bot_token or "", chat_id or ""
+
+    async def send_message(self, message: str, bot_token: Optional[str] = None, chat_id: Optional[str] = None) -> bool:
+        enabled, default_token, default_chat = self.get_credentials()
+        token = bot_token or default_token
+        target_chat = chat_id or default_chat
+
+        if not enabled and not bot_token:
+            logger.debug("Notifikasi Telegram dinonaktifkan.")
             return False
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
+        if not token or not target_chat:
+            logger.warning("Kredensial Telegram belum lengkap (Token / Chat ID kosong).")
+            return False
+
+        url = f"https://api.telegram.org/bot{token}/sendMessage"
         payload = {
-            "chat_id": self.chat_id,
+            "chat_id": target_chat,
             "text": message,
             "parse_mode": "HTML",
             "disable_web_page_preview": True,
@@ -30,41 +52,48 @@ class TelegramNotifier:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
-                    logger.info("Telegram message sent successfully.")
+                    logger.info("Notifikasi Telegram berhasil dikirim.")
                     return True
                 else:
-                    logger.error(f"Telegram send_message failed: {res.text}")
+                    logger.error(f"Telegram send_message gagal ({res.status_code}): {res.text}")
                     return False
         except Exception as e:
-            logger.error(f"Error sending Telegram message: {e}")
+            logger.error(f"Error mengirim Telegram: {e}")
             return False
 
-    async def send_photo(self, photo_path: str, caption: str = "") -> bool:
-        if not self.enabled or not self.bot_token or not self.chat_id:
+    async def send_photo(self, photo_path: str, caption: str = "", bot_token: Optional[str] = None, chat_id: Optional[str] = None) -> bool:
+        enabled, default_token, default_chat = self.get_credentials()
+        token = bot_token or default_token
+        target_chat = chat_id or default_chat
+
+        if not enabled and not bot_token:
+            return False
+
+        if not token or not target_chat:
             return False
 
         if not os.path.exists(photo_path):
             logger.warning(f"Screenshot file not found for Telegram: {photo_path}")
-            return await self.send_message(caption)
+            return await self.send_message(caption, token, target_chat)
 
-        url = f"https://api.telegram.org/bot{self.bot_token}/sendPhoto"
+        url = f"https://api.telegram.org/bot{token}/sendPhoto"
         try:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 with open(photo_path, "rb") as f:
                     files = {"photo": f}
-                    data = {"chat_id": self.chat_id, "caption": caption, "parse_mode": "HTML"}
+                    data = {"chat_id": target_chat, "caption": caption, "parse_mode": "HTML"}
                     res = await client.post(url, data=data, files=files)
                     if res.status_code == 200:
-                        logger.info("Telegram photo sent successfully.")
+                        logger.info("Telegram photo berhasil dikirim.")
                         return True
                     else:
-                        logger.error(f"Telegram send_photo failed: {res.text}")
+                        logger.error(f"Telegram send_photo gagal: {res.text}")
                         return False
         except Exception as e:
-            logger.error(f"Error sending Telegram photo: {e}")
+            logger.error(f"Error mengirim photo Telegram: {e}")
             return False
 
-    async def notify_order_result(self, result: OrderResult, strategy_name: str = "Strategi Kuantitatif") -> bool:
+    async def notify_order_result(self, result: OrderResult, strategy_name: str = "Strategi Saham") -> bool:
         action_icon = "🟢 <b>BELI (BUY)</b>" if result.action == "BUY" else "🔴 <b>JUAL (SELL)</b>"
         status_icon = "✅ <b>BERHASIL DITERIMA BROKER</b>" if result.success else "❌ <b>GAGAL EKSEKUSI</b>"
         
