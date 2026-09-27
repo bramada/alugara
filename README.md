@@ -21,13 +21,19 @@ Setelah server aktif, buka browser dan akses Web GUI Dashboard di:
 ---
 
 ### 2. Menghentikan Server (Stop)
-- **Jika berjalan di terminal interaktif:**  
-  Tekan shortcut **`Ctrl + C`** pada jendela terminal tempat server berjalan.
+Anda dapat menghentikan server dengan beberapa cara berikut:
 
-- **Jika berjalan di background (PowerShell):**  
-  Jalankan perintah berikut untuk menghentikan proses Python server:
+- **Cara 1 (CLI Alugara):**
+  Buka terminal baru di direktori alugara, lalu jalankan perintah:
   ```powershell
-  # Menghentikan proses yang mendengarkan di port 8000
+  python cli.py stop
+  ```
+
+- **Cara 2 (Shortcut Keyboard):**  
+  Tekan **`Ctrl + C`** pada jendela terminal tempat server sedang berjalan.
+
+- **Cara 3 (PowerShell Langsung):**
+  ```powershell
   Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
   ```
 
@@ -38,6 +44,7 @@ Setelah server aktif, buka browser dan akses Web GUI Dashboard di:
 | Perintah | Deskripsi |
 | :--- | :--- |
 | `python cli.py serve` | **Start Server**: Menjalankan Web Dashboard & Penjadwal Trading Otomatis (Port 8000) |
+| `python cli.py stop` | **Stop Server**: Menghentikan server Alugara yang sedang berjalan pada port 8000 |
 | `python cli.py login` | Membuka jendela Google Chrome interaktif untuk login/pairing ke Stockbit |
 | `python cli.py check-session` | Memeriksa apakah sesi login Stockbit masih aktif dan valid |
 | `python cli.py scan` | Menjalankan pemindaian sinyal saham intraday BEI secara instan |

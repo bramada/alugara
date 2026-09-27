@@ -1,4 +1,6 @@
 import asyncio
+import os
+import signal
 import click
 from loguru import logger
 from src.storage.db import init_db, get_active_positions, get_trade_logs
@@ -72,7 +74,7 @@ def test_telegram():
     """Kirim pesan uji coba ke Telegram Bot Anda"""
     notifier = TelegramNotifier()
     success = asyncio.run(notifier.send_message(
-        "🤖 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\n"
+        "⚡ <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\n"
         "Koneksi Telegram Bot berhasil terhubung ke server Alugara Standalone!"
     ))
     if success:
@@ -85,9 +87,27 @@ def test_telegram():
 @click.option("--port", default=settings.PORT, type=int, help="Port number")
 @click.option("--reload", is_flag=True, default=False, help="Enable auto-reload")
 def serve(host, port, reload):
-    """Jalankan Server API & Scheduler Alugara"""
+    """Jalankan Server API & Scheduler Alugara (Start Server)"""
     import uvicorn
     uvicorn.run("src.api.main:app", host=host, port=port, reload=reload)
+
+@cli.command()
+@click.option("--port", default=settings.PORT, type=int, help="Port number server yang akan dihentikan")
+def stop(port):
+    """Hentikan server Alugara yang sedang berjalan (Stop Server)"""
+    import subprocess
+    import sys
+    try:
+        if sys.platform == "win32":
+            cmd = f'powershell -Command "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force }}"'
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            click.secho(f"🛑 Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
+        else:
+            cmd = f"fuser -k {port}/tcp"
+            subprocess.run(cmd, shell=True, capture_output=True)
+            click.secho(f"🛑 Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
+    except Exception as e:
+        click.secho(f"❌ Gagal menghentikan server: {e}", fg="red")
 
 if __name__ == "__main__":
     cli()
