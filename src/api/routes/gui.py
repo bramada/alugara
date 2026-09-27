@@ -101,8 +101,8 @@ async def get_gui_dashboard_status():
             "telegram_enabled": db_settings.get("telegram_enabled", str(settings.TELEGRAM_ENABLED)).lower() == "true",
             "telegram_bot_token": "****" if stored_tele_token else "",
             "telegram_chat_id": db_settings.get("telegram_chat_id", settings.TELEGRAM_CHAT_ID),
-            "market_buy_time": f"{settings.MARKET_BUY_HOUR:02d}:{settings.MARKET_BUY_MINUTE:02d} WIB",
-            "market_sell_time": f"{settings.MARKET_SELL_HOUR:02d}:{settings.MARKET_SELL_MINUTE:02d} WIB",
+            "market_buy_time": "09:00 - 15:45 WIB (Intraday Multi-Trade)",
+            "market_sell_time": "Real-Time TP/SL (+1.5% s/d +3.5%)",
         }
     }
 
@@ -174,8 +174,8 @@ async def trigger_browser_login(background_tasks: BackgroundTasks):
 
 @router.post("/trigger-buy")
 async def trigger_manual_buy():
-    await engine.run_afternoon_auto_buy()
-    return {"success": True, "message": "Rutinitas eksekusi Beli Sore berhasil dijalankan."}
+    await engine.run_intraday_cycle(force_scan=True)
+    return {"success": True, "message": "Siklus Intraday Scan & Trade berhasil dieksekusi."}
 
 @router.post("/trigger-sell")
 async def trigger_manual_sell():

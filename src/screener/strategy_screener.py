@@ -5,15 +5,16 @@ from loguru import logger
 
 class StrategyScreener:
     """
-    Internal Quantitative Screener untuk Alugara (Standalone)
-    Mengambil data live IDX dari market feed dan memilih emiten terbaik.
+    Internal Quantitative & Intraday Screener untuk Alugara (Standalone)
+    Mengambil data live IDX dari market feed dan mendeteksi momentum, volume breakout, serta reversal.
     """
     
-    # Daftar kandidat emiten Likuid IDX untuk di-screen
+    # Daftar kandidat emiten Likuid IDX (LQ45 & High Volume Movers)
     UNIVERSE = [
         "BBCA", "BBRI", "BMRI", "BBNI", "ASII", "TLKM", "UNTR", "ICBP",
         "INDF", "AMRT", "ADRO", "PTBA", "MDKA", "MEDC", "KLBF", "CPIN",
-        "BRIS", "ACES", "MYOR", "INKP", "PGAS", "CTRA", "BSDE", "SMRA"
+        "BRIS", "ACES", "MYOR", "INKP", "PGAS", "CTRA", "BSDE", "SMRA",
+        "GOTO", "BUKA", "ARTO", "EMTK", "TOWR", "TBIG", "ANTM", "INCO"
     ]
 
     @classmethod
@@ -46,41 +47,53 @@ class StrategyScreener:
     @classmethod
     async def scan_market_signals(cls) -> List[Dict[str, Any]]:
         """
-        Memindai kandidat saham terbaik sore hari (BSJP Momentum)
+        Memindai kandidat saham aktif intraday untuk peluang cuan cepat & minim risiko
         """
-        logger.info("Memulai scanning kuantitatif internal Alugara...")
+        logger.info("Memulai scanning intraday real-time pasar BEI...")
         tasks = [cls.fetch_quote(t) for t in cls.UNIVERSE]
         quotes = await asyncio.gather(*tasks)
 
         # Filter saham aktif dengan momentum positif
         valid_quotes = [q for q in quotes if q["success"] and q["price"] > 0]
-        # Urutkan berdasarkan momentum persentase kenaikan harian yang sehat (+0.5% s/d +4.5%)
+        
+        # Urutkan berdasarkan momentum persentase kenaikan harian yang sehat (+0.5% s/d +7.0%)
         sorted_candidates = sorted(
-            [q for q in valid_quotes if 0.5 <= q["change_percent"] <= 5.0],
+            [q for q in valid_quotes if 0.5 <= q["change_percent"] <= 7.0],
             key=lambda x: x["change_percent"],
             reverse=True
         )
 
-        # Bebas tanpa batasan kaku: loloskan semua kandidat yang memenuhi kriteria momentum positif ke AI
-        selected_candidates = sorted_candidates if sorted_candidates else [q for q in valid_quotes if q["change_percent"] > 0]
-        if not selected_candidates:
-            selected_candidates = valid_quotes
+        candidates = sorted_candidates if sorted_candidates else [q for q in valid_quotes if q["change_percent"] > 0]
+        if not candidates:
+            candidates = valid_quotes
 
         signals = []
-        for item in selected_candidates:
+        for item in candidates:
             p = item["price"]
-            # Target TP +3.0%, Stop Loss -2.5%
-            tp1 = int(round(p * 1.03))
-            sl = int(round(p * 0.975))
+            pct = item["change_percent"]
+            
+            # Klasifikasi strategi intraday secara dinamis
+            if pct >= 2.5:
+                strat = "Intraday Breakout Momentum"
+            elif pct >= 1.0:
+                strat = "Trend Following Accumulation"
+            else:
+                strat = "Scalping Rebound Setup"
+
+            # Target Cepat: TP1 +2.0%, TP2 +3.5%, Stop Loss ketat -1.5% (prioritas: asal tidak lose)
+            tp1 = int(round(p * 1.02))
+            tp2 = int(round(p * 1.035))
+            sl = int(round(p * 0.985))
+
             signals.append({
                 "ticker": item["ticker"],
                 "action": "BUY",
                 "current_price": p,
                 "target_price_1": tp1,
-                "target_price_2": int(round(p * 1.05)),
+                "target_price_2": tp2,
                 "stop_loss_price": sl,
-                "strategy_name": "BSJP 1 - Breakout Momentum"
+                "strategy_name": strat
             })
 
-        logger.info(f"Scanning selesai! Menghasilkan {len(signals)} sinyal eksekusi.")
+        logger.info(f"Scanning intraday selesai! Menghasilkan {len(signals)} kandidat sinyal aktif.")
         return signals

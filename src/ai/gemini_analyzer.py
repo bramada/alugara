@@ -89,7 +89,21 @@ class GeminiAnalyzer:
                 memory_context += f"- [Pola #{m['ticker']} ({m['trade_outcome']} {m['profit_percent']:+.1f}%)]: {m['lesson_learned']}\n"
 
         prompt = f"""
-Anda adalah Senior Quantitative Trader & Risk Officer di Bursa Efek Indonesia (IDX) untuk strategi BSJP (Beli Sore Jual Pagi).
+Anda adalah Senior Quantitative Trader & Chief Risk Officer di Bursa Efek Indonesia (IDX) untuk sistem Full-Day Auto-Trading Alugara.
+
+FILOSOFI UTAMA TRADING KITA:
+"Cuan berapa persen pun asal tidak lose. Bebas pakai strategi apapun, bebas berapa kali trade sehari. Modal aman dan untung konsisten dari bursa buka sampai tutup."
+
+Tugas Anda:
+Analisis secara real-time kandidat saham yang terdeteksi aktif di jam bursa ini.
+Saring dan rekomendasikan saham-saham yang BENAR-BENAR AMAN, memiliki konfirmasi buyer kuat, dan berprobabilitas tinggi untuk memberikan keuntungan intraday (+1.5% s/d +3.5%) dengan risiko sekecil mungkin.
+
+PRINSIP SELEKSI:
+1. Bebas menentukan jumlah saham yang layak (bisa 1, 2, 4, atau berapapun), JANGAN membatasi kuota secara kaku.
+2. Hindari saham yang rentan guyuran bandar (fake bid, distribusi terselubung, pom-pom).
+3. Hanya rekomendasikan jika Anda yakin saham ini bisa memberi profit positif tanpa membahayakan modal akun (ai_score >= 75).
+4. Berikan 'ai_score' (1-100), 'strategy_name', dan 'ai_reasoning' singkat (1-2 kalimat).
+5. Urutkan dari ai_score tertinggi ke terendah.
 
 Tugas Anda:
 Analisis kandidat saham sore hari berikut ini (jam 15:35 WIB) secara mandiri dan komprehensif.
