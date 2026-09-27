@@ -7,7 +7,8 @@ from src.config.settings import settings
 from src.storage.db import (
     get_setting,
     get_top_ai_memories,
-    save_ai_memory
+    save_ai_memory,
+    log_ai_usage
 )
 
 class GeminiAnalyzer:
@@ -94,6 +95,11 @@ class GeminiAnalyzer:
             try:
                 async with httpx.AsyncClient(timeout=25.0) as client:
                     res = await client.post(url, json=payload)
+                    usage_meta = res.json().get("usageMetadata", {}) if res.status_code == 200 else {}
+                    p_tok = usage_meta.get("promptTokenCount", 0)
+                    r_tok = usage_meta.get("candidatesTokenCount", 0)
+                    log_ai_usage(model=m, prompt_tokens=p_tok, response_tokens=r_tok, status_code=res.status_code, is_success=(res.status_code == 200))
+
                     if res.status_code == 200:
                         data = res.json()
                         candidates = data.get("candidates", [])
@@ -102,6 +108,7 @@ class GeminiAnalyzer:
                     else:
                         logger.warning(f"Gemini API ({m}) returned {res.status_code}: {res.text[:200]}")
             except Exception as e:
+                log_ai_usage(model=m, status_code=500, is_success=False)
                 logger.warning(f"Gemini API ({m}) exception: {e}")
 
         return None

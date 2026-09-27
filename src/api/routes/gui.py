@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from src.config.settings import settings
 from src.storage.db import (
     get_all_settings,
+    get_ai_quota_stats,
     set_setting,
     get_active_positions,
     get_trade_logs,

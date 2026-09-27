@@ -1,7 +1,7 @@
 ﻿import sqlite3
 import os
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
 DB_DIR = os.path.abspath("data")
@@ -256,3 +256,92 @@ def get_top_ai_memories(limit: int = 10) -> List[Dict[str, Any]]:
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+def log_ai_usage(model: str, prompt_tokens: int = 0, response_tokens: int = 0, status_code: int = 200, is_success: bool = True):
+    """Mencatat setiap pemanggilan API Google Gemini untuk monitoring kuota & rate-limit"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        total = prompt_tokens + response_tokens
+        now_iso = datetime.now(timezone.utc).isoformat()
+        cursor.execute("""
+        INSERT INTO ai_usage_logs (model, prompt_tokens, response_tokens, total_tokens, status_code, is_success, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (model, prompt_tokens, response_tokens, total, status_code, 1 if is_success else 0, now_iso))
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"Error logging AI usage: {e}")
+
+def get_ai_quota_stats() -> Dict[str, Any]:
+    """Menghitung rincian kuota Gemini (Daily Limit RPD, Rate Limit RPM, dan Countdown Reset)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        now_utc = datetime.now(timezone.utc)
+        today_start_utc = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        tomorrow_start_utc = (now_utc.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
+        
+        # Hitung waktu reset (00:00 UTC = 07:00 WIB)
+        diff = tomorrow_start_utc - now_utc
+        hours_to_reset = diff.seconds // 3600
+        minutes_to_reset = (diff.seconds % 3600) // 60
+        reset_text = f"{hours_to_reset} jam, {minutes_to_reset:02d} menit"
+
+        # 1. Daily Limit (RPD - Requests Per Day) Standard Free Tier = 1,500 RPD
+        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (today_start_utc,))
+        daily_used = cursor.fetchone()[0] or 0
+        daily_max = 1500
+        daily_remaining = max(0, daily_max - daily_used)
+        daily_remaining_pct = max(0, min(100, round((daily_remaining / daily_max) * 100)))
+
+        # 2. Per-Minute Rate Limit (RPM) Standard Free Tier = 15 RPM (Rolling 60s)
+        sixty_sec_ago = (now_utc - timedelta(seconds=60)).isoformat()
+        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (sixty_sec_ago,))
+        rpm_used = cursor.fetchone()[0] or 0
+        rpm_max = 15
+        rpm_remaining = max(0, rpm_max - rpm_used)
+        rpm_remaining_pct = max(0, min(100, round((rpm_remaining / rpm_max) * 100)))
+
+        # 3. Total Tokens & Total Calls
+        cursor.execute("SELECT SUM(total_tokens), COUNT(*) FROM ai_usage_logs")
+        row = cursor.fetchone()
+        all_time_tokens = row[0] or 0
+        all_time_calls = row[1] or 0
+
+        conn.close()
+
+        status_text = "Optimal (100%)"
+        if rpm_remaining_pct < 20 or daily_remaining_pct < 10:
+            status_text = "High Usage"
+        elif daily_remaining_pct < 5:
+            status_text = "Quota Low"
+
+        daily_subtext = f"Terpakai {daily_used:,} dari {daily_max:,} request. Refresh penuh dalam {reset_text}."
+        rpm_subtext = f"{rpm_used} dari {rpm_max} RPM aktif. Rolling window 60 detik siap melayani."
+
+        return {
+            "daily_used": daily_used,
+            "daily_max": daily_max,
+            "daily_remaining": daily_remaining,
+            "daily_remaining_pct": daily_remaining_pct,
+            "daily_subtext": daily_subtext,
+            "rpm_used": rpm_used,
+            "rpm_max": rpm_max,
+            "rpm_remaining_pct": rpm_remaining_pct,
+            "rpm_subtext": rpm_subtext,
+            "reset_in": reset_text,
+            "all_time_calls": all_time_calls,
+            "all_time_tokens": all_time_tokens,
+            "status_text": status_text
+        }
+    except Exception as e:
+        return {
+            "daily_remaining_pct": 100,
+            "daily_subtext": "Monitoring kuota aktif (1,500 RPD).",
+            "rpm_remaining_pct": 100,
+            "rpm_subtext": "15 RPM rolling rate limit.",
+            "reset_in": "24 jam",
+            "status_text": "Optimal"
+        }
