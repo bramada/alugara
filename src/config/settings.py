@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     STOCKBIT_TRADING_PIN: str = ""
     STOCKBIT_SESSION_DIR: str = "./sessions"
 
+    # Gemini AI
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-1.5-flash"
+    AI_REASONING_ENABLED: bool = True
+
     # Browser
     HEADLESS_MODE: bool = True
     BROWSER_TIMEOUT_MS: int = 30000

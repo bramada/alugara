@@ -14,18 +14,20 @@ from src.storage.db import (
     get_trade_logs,
 )
 from src.screener.strategy_screener import StrategyScreener
+from src.ai.gemini_analyzer import GeminiAnalyzer
 
 class ExecutionEngine:
     """
-    Orkestrator Eksekusi Mandiri (100% Standalone Alugara Engine)
+    Orkestrator Eksekusi Mandiri Alugara dengan Integrasi Gemini AI
     """
     def __init__(self):
         self.driver = StockbitDriver()
         self.notifier = TelegramNotifier()
         self.risk_manager = RiskManager()
         self.screener = StrategyScreener()
+        self.ai = GeminiAnalyzer()
 
-    async def execute_single_order(self, req: OrderRequest) -> OrderResult:
+    async def execute_single_order(self, req: OrderRequest, ai_score: int = 0, ai_reasoning: str = "") -> OrderResult:
         """
         Mengeksekusi satu order beli/jual secara mandiri
         """
@@ -59,6 +61,8 @@ class ExecutionEngine:
                 "stop_loss_price": req.stop_loss_price,
                 "entry_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "status": "ACTIVE_HOLD",
+                "ai_score": ai_score,
+                "ai_reasoning": ai_reasoning,
                 "screenshot_path": result.screenshot_path
             })
             logger.info(f"Posisi aktif {req.ticker} berhasil disimpan di database internal Alugara.")
@@ -71,16 +75,18 @@ class ExecutionEngine:
     async def run_afternoon_auto_buy(self):
         """
         Jadwal Beli Sore (15:40 WIB):
-        1. Jalankan screener internal untuk memilih 3 saham terbaik.
-        2. Alokasikan modal per strategi (dibagi rata ke 3 emiten).
-        3. Eksekusi order Beli otomatis di Stockbit.
+        1. Jalankan screener internal untuk mendapatkan kandidat saham potensial.
+        2. Filter & Analisis mendalam menggunakan Gemini AI.
+        3. Alokasikan modal & Eksekusi order Beli di Stockbit.
         """
         logger.info("🚀 [ALUGARA AUTO-BUY] Memulai rutinitas eksekusi beli sore 15:40 WIB...")
-        signals = await self.screener.scan_market_signals()
-        if not signals:
+        raw_signals = await self.screener.scan_market_signals()
+        if not raw_signals:
             logger.warning("Tidak ada sinyal yang memenuhi kriteria hari ini.")
             return
 
+        # Saring & Berikan Skor via Gemini AI
+        signals = await self.ai.analyze_and_rank_candidates(raw_signals)
         capital_per_stock = settings.CAPITAL_PER_STRATEGY / max(1, len(signals))
 
         for sig in signals:
@@ -99,14 +105,18 @@ class ExecutionEngine:
                 stop_loss_price=sig.get("stop_loss_price")
             )
 
-            await self.execute_single_order(req)
+            await self.execute_single_order(
+                req, 
+                ai_score=sig.get("ai_score", 0), 
+                ai_reasoning=sig.get("ai_reasoning", "")
+            )
 
     async def run_morning_auto_sell(self):
         """
         Jadwal Jual Pagi (09:10 WIB):
-        1. Cek semua posisi aktif dari database internal.
-        2. Ambil harga pembukaan pasar hari ini.
-        3. Eksekusi jual untuk realisasi Take Profit / Stop Loss / Time-Exit.
+        1. Evaluasi seluruh posisi aktif.
+        2. Eksekusi jual untuk Take Profit / Stop Loss.
+        3. Gemini AI Self-Reflection untuk mengekstrak 'Pelajaran Emas'.
         """
         logger.info("🎯 [ALUGARA AUTO-SELL] Memulai rutinitas evaluasi jual pagi 09:10 WIB...")
         positions = get_active_positions()
@@ -142,11 +152,10 @@ class ExecutionEngine:
                 strategy_name=req.strategy_name
             )
 
-            # Update database internal Alugara
             exit_reason = "TP_HIT" if profit_pct >= 2.0 else ("SL_HIT" if profit_pct <= -2.0 else "TIME_EXIT_MORNING")
             status = "WIN" if net_profit >= 0 else "LOSS"
 
-            close_position_to_trade_log(pos["id"], {
+            trade_log_item = {
                 "ticker": pos["ticker"],
                 "strategy_name": pos["strategy_name"],
                 "action": "SELL",
@@ -162,7 +171,13 @@ class ExecutionEngine:
                 "entry_date": pos["entry_date"],
                 "exit_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "screenshot_path": result.screenshot_path
-            })
+            }
 
-            # Kirim Telegram
+            # 1. Simpan ke database trade log
+            close_position_to_trade_log(pos["id"], trade_log_item)
+
+            # 2. Refleksi Mandiri oleh Gemini AI (Continuous Learning)
+            await self.ai.reflect_on_closed_trade(trade_log_item)
+
+            # 3. Kirim Telegram
             await self.notifier.notify_order_result(result, pos.get("strategy_name", "Strategi Saham"))
