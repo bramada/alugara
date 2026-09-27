@@ -49,6 +49,13 @@ app.include_router(gui.router)
 app.include_router(trade.router)
 app.include_router(session.router)
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def serve_favicon():
+    fav_path = os.path.join(os.path.dirname(__file__), "..", "static", "favicon.ico")
+    if os.path.exists(fav_path):
+        return FileResponse(fav_path)
+    return {"status": "not found"}
+
 @app.get("/")
 async def serve_gui_dashboard():
     """Menyajikan antarmuka Web Dashboard Alugara"""
