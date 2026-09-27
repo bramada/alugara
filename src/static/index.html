@@ -556,23 +556,60 @@
               </label>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div class="sm:col-span-2">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Gemini API Key</label>
                 <input type="password" x-model="formSettings.gemini_api_key" placeholder="Masukkan Gemini API Key (AIzaSy...)"
-                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400 font-mono">
+                       class="w-full px-4 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400 font-mono">
               </div>
 
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI</label>
-                <select x-model="formSettings.gemini_model" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400">
-                  <option value="gemini-3.1-pro">Gemini 3.1 Pro (Rekomendasi Utama - Deep Reasoning)</option>
-                  <option value="gemini-3.7-flash">Gemini 3.7 Flash High (Thinking & Fast)</option>
-                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra-Fast)</option>
-                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                </select>
+              <!-- Custom Premium Model Dropdown (Google Gemini Official) -->
+              <div class="relative" @click.outside="modelDropdownOpen = false">
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI (Google Gemini Official)</label>
+                
+                <!-- Dropdown Trigger Button -->
+                <button type="button" @click="modelDropdownOpen = !modelDropdownOpen"
+                        class="w-full px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-purple-500/60 text-white text-sm flex items-center justify-between transition-all focus:outline-none">
+                  <div class="flex items-center gap-2 truncate pr-2">
+                    <span class="font-bold text-white text-xs sm:text-sm" x-text="getSelectedModel().name"></span>
+                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider"
+                          :class="getSelectedModel().badgeClass" x-text="getSelectedModel().badge"></span>
+                  </div>
+                  <svg class="w-4 h-4 shrink-0 transition-transform duration-200 text-slate-400"
+                       :class="modelDropdownOpen ? 'rotate-180 text-purple-400' : ''"
+                       fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                <!-- Floating Menu -->
+                <div x-show="modelDropdownOpen" x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 translate-y-1 scale-98"
+                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition ease-in duration-100"
+                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave-end="opacity-0 translate-y-1 scale-98"
+                     class="absolute left-0 right-0 z-50 mt-2 bg-slate-900/95 border border-purple-500/40 rounded-2xl shadow-2xl p-2 max-h-80 overflow-y-auto backdrop-blur-2xl space-y-1 divide-y divide-slate-800/60">
+                  <template x-for="m in geminiModels" :key="m.id">
+                    <div @click="formSettings.gemini_model = m.id; modelDropdownOpen = false"
+                         :class="formSettings.gemini_model === m.id ? 'bg-purple-600/20 border-purple-500/40 text-purple-200' : 'hover:bg-slate-800/80 text-slate-300 hover:text-white border-transparent'"
+                         class="p-2.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-2">
+                      <div class="space-y-0.5 flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-bold text-xs sm:text-sm text-white" x-text="m.name"></span>
+                          <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider"
+                                :class="m.badgeClass" x-text="m.badge"></span>
+                        </div>
+                        <p class="text-[11px] text-slate-400 line-clamp-1" x-text="m.desc"></p>
+                      </div>
+                      <div x-show="formSettings.gemini_model === m.id" class="text-purple-400 pt-0.5 shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                  </template>
+                </div>
               </div>
             </div>
 
@@ -689,6 +726,78 @@
         nextActionText: '15:40 WIB (Beli Sore)',
         nextCountdownText: 'Menghitung waktu...',
         
+        modelDropdownOpen: false,
+        geminiModels: [
+          {
+            id: 'gemini-3.8-flash',
+            name: 'Gemini 3.8 Flash',
+            badge: 'Terbaru / Flagship',
+            badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+            desc: 'Model Flash tercepat & throughput tertinggi untuk eksekusi real-time IDX'
+          },
+          {
+            id: 'gemini-3.7-flash',
+            name: 'Gemini 3.7 Flash',
+            badge: 'Hybrid Thinking',
+            badgeClass: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30',
+            desc: 'Kemampuan berpikir reasoning multimodal untuk analisis pergerakan saham'
+          },
+          {
+            id: 'gemini-3.6-flash',
+            name: 'Gemini 3.6 Flash',
+            badge: 'Agentic Mode',
+            badgeClass: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+            desc: 'Dioptimalkan untuk eksekusi otomatis agen dan pengambilan keputusan cepat'
+          },
+          {
+            id: 'gemini-3.5-flash-lite',
+            name: 'Gemini 3.5 Flash-Lite',
+            badge: 'Hemat Token',
+            badgeClass: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
+            desc: 'Super ringan dan hemat kuota token API rate-limit'
+          },
+          {
+            id: 'gemini-3.1-pro',
+            name: 'Gemini 3.1 Pro',
+            badge: 'Deep Reasoning',
+            badgeClass: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+            desc: 'Kecerdasan tertinggi untuk kalkulasi risiko kompleks & analisis mendalam'
+          },
+          {
+            id: 'gemini-3-flash',
+            name: 'Gemini 3 Flash',
+            badge: 'Pro Intel Flash',
+            badgeClass: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
+            desc: 'Kecerdasan level Pro dengan kecepatan transmisi seri Flash'
+          },
+          {
+            id: 'gemini-2.5-pro',
+            name: 'Gemini 2.5 Pro',
+            badge: 'Stable Reasoning',
+            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
+            desc: 'Flagship reasoning generasi 2.5 yang stabil dan teruji'
+          },
+          {
+            id: 'gemini-2.5-flash',
+            name: 'Gemini 2.5 Flash',
+            badge: 'Speed Previous Gen',
+            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
+            desc: 'Performa kecepatan tinggi generasi 2.5'
+          },
+          {
+            id: 'gemini-2.0-flash',
+            name: 'Gemini 2.0 Flash',
+            badge: 'Standard GA',
+            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
+            desc: 'Versi standar general availability untuk penggunaan umum'
+          }
+        ],
+
+        getSelectedModel() {
+          const current = this.geminiModels.find(m => m.id === this.formSettings.gemini_model);
+          return current || this.geminiModels[0];
+        },
+
         // Security Gate & Auth State
         auth: {
           is_configured: false,
