@@ -42,6 +42,7 @@ app.add_middleware(
 os.makedirs("screenshots", exist_ok=True)
 os.makedirs("src/static", exist_ok=True)
 app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
+app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 # Include Routers
 app.include_router(auth.router)
@@ -53,7 +54,7 @@ app.include_router(session.router)
 async def serve_favicon():
     fav_path = os.path.join(os.path.dirname(__file__), "..", "static", "favicon.ico")
     if os.path.exists(fav_path):
-        return FileResponse(fav_path)
+        return FileResponse(fav_path, media_type="image/x-icon", headers={"Cache-Control": "public, max-age=3600"})
     return {"status": "not found"}
 
 @app.get("/")

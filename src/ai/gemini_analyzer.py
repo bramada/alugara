@@ -48,13 +48,13 @@ class GeminiAnalyzer:
             "contents": [
                 {
                     "parts": [
-                        {"text": "Halo Gemini, jawab singkat dalam 1 kalimat: Koneksi Gemini AI ke Alugara berhasil!"}
+                        {"text": "Halo Gemini, verifikasi koneksi sistem Alugara IDX Auto-Trading."}
                     ]
                 }
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 100,
+                "maxOutputTokens": 1024,
             }
         }
 
@@ -62,12 +62,7 @@ class GeminiAnalyzer:
             async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
-                    data = res.json()
-                    candidates = data.get("candidates", [])
-                    if candidates:
-                        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        return True, text.strip() or "Koneksi ke Gemini AI berhasil!"
-                    return True, "Koneksi ke Gemini AI aktif dan merespons."
+                    return True, f"Koneksi ke Google Gemini AI ({target_model}) berhasil aktif & siap digunakan!"
                 else:
                     err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
                     err_msg = err_json.get("error", {}).get("message", res.text)
