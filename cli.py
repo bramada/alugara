@@ -1,6 +1,8 @@
 import asyncio
 import os
 import signal
+import subprocess
+import sys
 import click
 from loguru import logger
 from src.storage.db import init_db, get_active_positions, get_trade_logs
@@ -27,18 +29,18 @@ def check_session():
     driver = StockbitDriver(headless=True)
     valid, msg = asyncio.run(driver.check_session_valid())
     if valid:
-        click.secho(f"✅ {msg}", fg="green", bold=True)
+        click.secho(f"[OK] {msg}", fg="green", bold=True)
     else:
-        click.secho(f"❌ {msg}", fg="red", bold=True)
+        click.secho(f"[ERROR] {msg}", fg="red", bold=True)
 
 @cli.command()
 def scan():
     """Jalankan screener internal Alugara untuk melihat rekomendasi emiten hari ini"""
     engine = ExecutionEngine()
     signals = asyncio.run(engine.screener.scan_market_signals())
-    click.secho(f"\n📊 Hasil Screener Internal Alugara ({len(signals)} Saham):", fg="cyan", bold=True)
+    click.secho(f"\nHasil Screener Internal Alugara ({len(signals)} Saham):", fg="cyan", bold=True)
     for s in signals:
-        click.echo(f"• {s['ticker']}: Rp {s['current_price']:,} (TP: Rp {s['target_price_1']:,} | SL: Rp {s['stop_loss_price']:,})")
+        click.echo(f"- {s['ticker']}: Rp {s['current_price']:,} (TP: Rp {s['target_price_1']:,} | SL: Rp {s['stop_loss_price']:,})")
 
 @cli.command()
 def run_buy():
@@ -56,31 +58,31 @@ def run_sell():
 def positions():
     """Lihat daftar posisi saham aktif yang sedang di-hold di database internal Alugara"""
     pos = get_active_positions()
-    click.secho(f"\n💼 Posisi Aktif Alugara ({len(pos)} Saham):", fg="yellow", bold=True)
+    click.secho(f"\nPosisi Aktif Alugara ({len(pos)} Saham):", fg="yellow", bold=True)
     for p in pos:
-        click.echo(f"• {p['ticker']} | {p['lots']} Lot | Beli: Rp {p['entry_price']:,} | Entry: {p['entry_date']}")
+        click.echo(f"- {p['ticker']} | {p['lots']} Lot | Beli: Rp {p['entry_price']:,} | Entry: {p['entry_date']}")
 
 @cli.command()
 def history():
     """Lihat histori transaksi yang sudah selesai dieksekusi Alugara"""
     logs = get_trade_logs(limit=20)
-    click.secho(f"\n📜 Histori Transaksi ({len(logs)} Trade):", fg="blue", bold=True)
+    click.secho(f"\nHistori Transaksi ({len(logs)} Trade):", fg="blue", bold=True)
     for l in logs:
         status_color = "green" if l['status'] == "WIN" else "red"
-        click.secho(f"• {l['ticker']} | {l['status']} ({l['profit_percent']:+.2f}%) | Beli: Rp {l['entry_price']:,} -> Jual: Rp {l['exit_price']:,} | P/L: Rp {l['net_profit']:+,.0f}", fg=status_color)
+        click.secho(f"- {l['ticker']} | {l['status']} ({l['profit_percent']:+.2f}%) | Beli: Rp {l['entry_price']:,} -> Jual: Rp {l['exit_price']:,} | P/L: Rp {l['net_profit']:+,.0f}", fg=status_color)
 
 @cli.command()
 def test_telegram():
     """Kirim pesan uji coba ke Telegram Bot Anda"""
     notifier = TelegramNotifier()
     success = asyncio.run(notifier.send_message(
-        "⚡ <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\n"
+        "<b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\n"
         "Koneksi Telegram Bot berhasil terhubung ke server Alugara Standalone!"
     ))
     if success:
-        click.secho("✅ Notifikasi Telegram berhasil terkirim!", fg="green")
+        click.secho("[OK] Notifikasi Telegram berhasil terkirim!", fg="green")
     else:
-        click.secho("❌ Gagal mengirim ke Telegram. Cek TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di .env.", fg="red")
+        click.secho("[ERROR] Gagal mengirim ke Telegram. Cek TELEGRAM_BOT_TOKEN dan TELEGRAM_CHAT_ID di .env.", fg="red")
 
 @cli.command()
 @click.option("--host", default=settings.HOST, help="Host address")
@@ -95,19 +97,17 @@ def serve(host, port, reload):
 @click.option("--port", default=settings.PORT, type=int, help="Port number server yang akan dihentikan")
 def stop(port):
     """Hentikan server Alugara yang sedang berjalan (Stop Server)"""
-    import subprocess
-    import sys
     try:
         if sys.platform == "win32":
             cmd = f'powershell -Command "Get-NetTCPConnection -LocalPort {port} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force }}"'
-            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            click.secho(f"🛑 Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
+            subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            click.secho(f"[STOP] Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
         else:
             cmd = f"fuser -k {port}/tcp"
             subprocess.run(cmd, shell=True, capture_output=True)
-            click.secho(f"🛑 Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
+            click.secho(f"[STOP] Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
     except Exception as e:
-        click.secho(f"❌ Gagal menghentikan server: {e}", fg="red")
+        click.secho(f"[ERROR] Gagal menghentikan server: {e}", fg="red")
 
 if __name__ == "__main__":
     cli()

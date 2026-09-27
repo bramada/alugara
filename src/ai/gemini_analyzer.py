@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import os
 import json
 import httpx
@@ -14,8 +15,18 @@ from src.storage.db import (
 class GeminiAnalyzer:
     """
     Mesin Analisis AI Mendalam berbasis Google Gemini
-    Dilengkapi Long-Term Memory Playbook (Continuous Learning).
+    Dilengkapi Multi-Model Auto-Fallback & Long-Term Memory Playbook.
     """
+
+    # Model resmi Google AI Studio berkinerja tinggi
+    RECOMMENDED_MODELS = [
+        "gemini-flash-latest",
+        "gemini-3.8-flash",
+        "gemini-3.6-flash",
+        "gemini-flash-lite-latest",
+        "gemini-3.7-flash",
+        "gemini-pro-latest"
+    ]
 
     def __init__(self):
         pass
@@ -30,14 +41,14 @@ class GeminiAnalyzer:
         return settings.GEMINI_API_KEY or ""
 
     def get_model(self) -> str:
-        return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-3.7-flash"
+        return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-flash-latest"
 
     def is_enabled(self) -> bool:
         enabled_setting = get_setting("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED))
         return enabled_setting.lower() == "true" and bool(self.get_api_key())
 
     async def test_connection(self, api_key: Optional[str] = None, model: Optional[str] = None) -> tuple[bool, str]:
-        """Uji koneksi ke Google Gemini API secara presisi dengan pesan error detail"""
+        """Uji koneksi ke Google Gemini API dengan auto-fallback jika model spesifik sedang 503/429"""
         key = api_key or self.get_api_key()
         if not key:
             return False, "API Key kosong. Silakan masukkan Gemini API Key Anda."
@@ -55,19 +66,31 @@ class GeminiAnalyzer:
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 1024,
+                "maxOutputTokens": 256,
             }
         }
 
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
-                    return True, f"Koneksi ke Google Gemini AI ({target_model}) berhasil aktif & siap digunakan!"
-                else:
-                    err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
-                    err_msg = err_json.get("error", {}).get("message", res.text)
-                    return False, f"Google Gemini Error ({res.status_code}): {err_msg}"
+                    log_ai_usage(model=target_model, prompt_tokens=15, response_tokens=15, status_code=200, is_success=True)
+                    return True, f"Koneksi ke Google Gemini AI ({target_model}) aktif & siap melayani analisis saham!"
+                
+                # Jika model utama mengalami 503 (High Demand) atau 429 (Rate Limit), uji coba fallback
+                if res.status_code in [503, 429]:
+                    for fallback in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"]:
+                        if fallback == target_model:
+                            continue
+                        fb_url = f"https://generativelanguage.googleapis.com/v1beta/models/{fallback}:generateContent?key={key}"
+                        fb_res = await client.post(fb_url, json=payload)
+                        if fb_res.status_code == 200:
+                            log_ai_usage(model=fallback, prompt_tokens=15, response_tokens=15, status_code=200, is_success=True)
+                            return True, f"API Key Valid! Model '{target_model}' sedang lonjakan trafik ({res.status_code}). Sistem otomatis mem-fallback ke '{fallback}' sehingga trading tetap aman."
+                
+                err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
+                err_msg = err_json.get("error", {}).get("message", res.text)
+                return False, f"Google Gemini Error ({res.status_code}): {err_msg}"
         except Exception as e:
             return False, f"Gagal menghubungi server Gemini: {e}"
 
@@ -77,9 +100,10 @@ class GeminiAnalyzer:
             return None
 
         target_model = model or self.get_model()
-        # Fallback list jika model utama sedang mengalami temporary high-demand (503)
+        
+        # Bangun urutan model fallback
         models_to_try = [target_model]
-        for fb in ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]:
+        for fb in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-lite-latest"]:
             if fb not in models_to_try:
                 models_to_try.append(fb)
 
@@ -106,7 +130,7 @@ class GeminiAnalyzer:
                         if candidates:
                             return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
                     else:
-                        logger.warning(f"Gemini API ({m}) returned {res.status_code}: {res.text[:200]}")
+                        logger.warning(f"Gemini API ({m}) status {res.status_code}, mencoba fallback model berikutnya...")
             except Exception as e:
                 log_ai_usage(model=m, status_code=500, is_success=False)
                 logger.warning(f"Gemini API ({m}) exception: {e}")
@@ -116,14 +140,14 @@ class GeminiAnalyzer:
     async def analyze_and_rank_candidates(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         FASE 1 (Pre-Trade AI Gatekeeper):
-        Menganalisis daftar kandidat saham sore hari, menyaring jebakan bandar,
-        memberi skor keyakinan AI (1-100), dan memilih saham-saham yang benar-benar layak tanpa batasan kuota kaku.
+        Menganalisis daftar kandidat saham, menyaring jebakan bandar,
+        memberi skor keyakinan AI (1-100), dan memilih saham-saham yang benar-benar layak.
         """
         if not candidates:
             return []
 
         if not self.is_enabled():
-            logger.info("Gemini AI reasoning nonaktif/tanpa API Key. Menggunakan ranking teknikal standar tanpa batasan kuota.")
+            logger.info("Gemini AI reasoning nonaktif/tanpa API Key. Menggunakan ranking kuantitatif standar.")
             return candidates
 
         # 1. Ambil Buku Pintar Memori Masa Lalu (RAG Memory Context)
@@ -135,42 +159,26 @@ class GeminiAnalyzer:
                 memory_context += f"- [Pola #{m['ticker']} ({m['trade_outcome']} {m['profit_percent']:+.1f}%)]: {m['lesson_learned']}\n"
 
         prompt = f"""
-Anda adalah Senior Quantitative Trader & Chief Risk Officer di Bursa Efek Indonesia (IDX) untuk sistem Full-Day Auto-Trading Alugara.
+Anda adalah Senior Quantitative Trader & Chief Risk Officer di Bursa Efek Indonesia (IDX) untuk sistem Auto-Trading Alugara.
 
-FILOSOFI UTAMA TRADING KITA:
-"Cuan berapa persen pun asal tidak lose. Bebas pakai strategi apapun, bebas berapa kali trade sehari. Modal aman dan untung konsisten dari bursa buka sampai tutup."
+FILOSOFI UTAMA TRADING:
+"Cuan berapa persen pun asal tidak lose. Modal aman dan untung konsisten."
 
 Tugas Anda:
 Analisis secara real-time kandidat saham yang terdeteksi aktif di jam bursa ini.
-Saring dan rekomendasikan saham-saham yang BENAR-BENAR AMAN, memiliki konfirmasi buyer kuat, dan berprobabilitas tinggi untuk memberikan keuntungan intraday (+1.5% s/d +3.5%) dengan risiko sekecil mungkin.
+Saring dan rekomendasikan saham-saham yang BENAR-BENAR AMAN, memiliki konfirmasi akumulasi buyer kuat, dan berprobabilitas tinggi untuk memberikan keuntungan (+1.5% s/d +3.5%) dengan risiko sekecil mungkin.
 
 PRINSIP SELEKSI:
 1. Bebas menentukan jumlah saham yang layak (bisa 1, 2, 4, atau berapapun), JANGAN membatasi kuota secara kaku.
 2. Hindari saham yang rentan guyuran bandar (fake bid, distribusi terselubung, pom-pom).
-3. Hanya rekomendasikan jika Anda yakin saham ini bisa memberi profit positif tanpa membahayakan modal akun (ai_score >= 75).
+3. Hanya rekomendasikan jika Anda yakin saham ini aman dan berpotensi naik (ai_score >= 75).
 4. Berikan 'ai_score' (1-100), 'strategy_name', dan 'ai_reasoning' singkat (1-2 kalimat).
 5. Urutkan dari ai_score tertinggi ke terendah.
-
-Tugas Anda:
-Analisis kandidat saham sore hari berikut ini (jam 15:35 WIB) secara mandiri dan komprehensif.
-Pilihlah saham-saham yang BENAR-BENAR LAYAK dan berprobabilitas tinggi untuk naik 2% - 5% di pembukaan pasar besok pagi.
-
-ATURAN PENTING JUMLAH SAHAM:
-- JANGAN MEMBATASI JUMLAH SAHAM. Jumlah saham yang Anda rekomendasikan BEBAS (bisa 1, 2, 3, 4, 5, atau lebih) sesuai murni hasil analisa teknikal, bandarmologi, dan manajemen risiko Anda.
-- Jika ada banyak saham yang memenuhi syarat dan aman dari jebakan bandar, pilih semuanya.
-- Jika hanya sedikit atau bahkan hanya 1 yang benar-benar bagus, pilih yang bagus saja. Prioritas mutlak adalah profit konsisten tanpa risiko tinggi.
 
 {memory_context}
 
 DAFTAR KANDIDAT SAHAM HARI INI:
 {json.dumps(candidates, indent=2)}
-
-INSTRUKSI ANALISIS:
-1. Periksa momentum kenaikan harga, kestabilan tick harga, dan potensi fake breakout.
-2. Berikan 'ai_score' (1 - 100) untuk setiap saham.
-3. Berikan 'ai_reasoning' singkat (maksimal 2 kalimat) dalam Bahasa Indonesia.
-3. Hanya masukkan saham yang memiliki skor keyakinan tinggi (ai_score >= 75) ke dalam rekomendasi final.
-4. Urutkan dari ai_score tertinggi ke terendah tanpa membatasi jumlah rekomendasi.
 
 Kembalikan HANYA format JSON murni array of objects tanpa markdown:
 [
@@ -193,7 +201,6 @@ Kembalikan HANYA format JSON murni array of objects tanpa markdown:
 
         if raw_response:
             try:
-                # Bersihkan format jika ada code block markdown
                 clean_json = raw_response.strip()
                 if clean_json.startswith("```json"):
                     clean_json = clean_json[7:]
@@ -213,14 +220,13 @@ Kembalikan HANYA format JSON murni array of objects tanpa markdown:
     async def reflect_on_closed_trade(self, trade_data: Dict[str, Any]):
         """
         FASE 2 (Post-Trade Self-Reflection):
-        Mengevaluasi hasil trade pagi hari (WIN/LOSS), merumuskan 'Pelajaran Emas',
-        dan menyimpannya ke tabel `ai_market_memories` agar AI makin pintar.
+        Mengevaluasi hasil trade (WIN/LOSS) dan menyimpannya ke tabel `ai_market_memories`.
         """
         if not self.is_enabled():
             return
 
         ticker = trade_data["ticker"]
-        outcome = trade_data["status"] # WIN / LOSS
+        outcome = trade_data["status"]
         profit_pct = trade_data["profit_percent"]
         entry_p = trade_data["entry_price"]
         exit_p = trade_data["exit_price"]
@@ -246,7 +252,6 @@ Kembalikan HANYA format JSON murni:
   "lesson_learned": "..."
 }}
 """
-        logger.info(f"Gemini AI sedang melakukan Post-Mortem Reflection untuk trade {ticker} ({outcome})...")
         raw_response = await self.call_gemini(prompt)
 
         if raw_response:
@@ -260,7 +265,6 @@ Kembalikan HANYA format JSON murni:
                 analysis = res.get("analysis", f"Trade {outcome} dengan profit {profit_pct:.2f}%")
                 lesson = res.get("lesson_learned", f"Pertahankan disiplin target profit dan batas risiko pada {ticker}.")
 
-                # Simpan ke Database Memori Permanen
                 save_ai_memory(
                     ticker=ticker,
                     strategy_name=strategy,
@@ -271,6 +275,6 @@ Kembalikan HANYA format JSON murni:
                     ai_analysis=analysis,
                     lesson_learned=lesson
                 )
-                logger.info(f"✅ Pelajaran baru untuk #{ticker} berhasil diabadikan ke Buku Pintar AI!")
+                logger.info(f"Pelajaran baru untuk #{ticker} berhasil diabadikan ke Buku Pintar AI!")
             except Exception as e:
                 logger.error(f"Gagal mencatat memori AI: {e}")

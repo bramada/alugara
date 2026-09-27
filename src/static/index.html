@@ -766,7 +766,7 @@
                 <div class="flex items-center gap-2">
                   <h4 class="text-xs font-bold text-slate-200 tracking-wide flex items-center gap-1.5">
                     <span>Gemini Models</span>
-                    <span class="text-slate-400 hover:text-slate-200 cursor-pointer text-xs" title="Monitoring real-time kuota Google AI Studio: 1,500 RPD harian & 15 RPM per-menit.">ⓘ</span>
+                    <span class="text-slate-400 hover:text-slate-200 cursor-pointer text-xs" title="Monitoring kuota Google Gemini AI model (Antigravity Style).">ⓘ</span>
                   </h4>
                 </div>
                 <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md flex items-center gap-1.5">
@@ -776,20 +776,20 @@
               </div>
 
               <div class="space-y-2.5">
-                <!-- Card 1: Batas Kuota Harian (Daily Limit Remaining) -->
+                <!-- Card 1: Weekly Limit Remaining -->
                 <div class="p-3.5 rounded-2xl bg-[#080d18] border border-slate-800/90 hover:border-purple-500/40 flex items-center justify-between gap-4 transition-all">
                   <div class="space-y-1 flex-1 min-w-0">
-                    <div class="text-xs font-semibold text-slate-200">Weekly Limit Remaining (Daily RPD 1,500)</div>
-                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.daily_subtext : 'Terpakai 0 dari 1,500 request harian. Akan refresh penuh dalam 15 jam, 05 menit.'"></p>
+                    <div class="text-xs font-semibold text-slate-200">Weekly Limit Remaining</div>
+                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.weekly_subtext : 'You have used some of your weekly limit, it will fully refresh in 5 days, 14 hours.'"></p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.daily_remaining_pct + '%') : '100%'"></span>
+                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.weekly_remaining_pct + '%') : '82%'"></span>
                     <!-- Circular Progress Ring -->
                     <div class="relative w-8 h-8 flex items-center justify-center">
                       <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
                         <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         <path class="text-emerald-400 transition-all duration-500"
-                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.daily_remaining_pct : 100}, 100`"
+                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.weekly_remaining_pct : 82}, 100`"
                               stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       </svg>
@@ -797,20 +797,20 @@
                   </div>
                 </div>
 
-                <!-- Card 2: Batas Rate Limit Menit (Per-Minute RPM Remaining) -->
+                <!-- Card 2: Five Hour Limit Remaining -->
                 <div class="p-3.5 rounded-2xl bg-[#080d18] border border-slate-800/90 hover:border-purple-500/40 flex items-center justify-between gap-4 transition-all">
                   <div class="space-y-1 flex-1 min-w-0">
-                    <div class="text-xs font-semibold text-slate-200">Rate Limit Remaining (15 RPM)</div>
-                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.rpm_subtext : '0 dari 15 RPM terpakai. Rolling window 60 detik siap melayani.'"></p>
+                    <div class="text-xs font-semibold text-slate-200">Five Hour Limit Remaining</div>
+                    <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.five_hour_subtext : 'You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.'"></p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.rpm_remaining_pct + '%') : '100%'"></span>
+                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.five_hour_remaining_pct + '%') : '96%'"></span>
                     <!-- Circular Progress Ring -->
                     <div class="relative w-8 h-8 flex items-center justify-center">
                       <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
                         <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         <path class="text-emerald-400 transition-all duration-500"
-                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.rpm_remaining_pct : 100}, 100`"
+                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.five_hour_remaining_pct : 96}, 100`"
                               stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       </svg>
@@ -1189,70 +1189,49 @@
         
         modelDropdownOpen: false,
         geminiModels: [
-          {
-            id: 'gemini-3.8-flash',
-            name: 'Gemini 3.8 Flash',
-            badge: 'Terbaru / Flagship',
-            badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-            desc: 'Model Flash tercepat & throughput tertinggi untuk eksekusi real-time IDX'
-          },
-          {
-            id: 'gemini-3.7-flash',
-            name: 'Gemini 3.7 Flash',
-            badge: 'Hybrid Thinking',
-            badgeClass: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30',
-            desc: 'Kemampuan berpikir reasoning multimodal untuk analisis pergerakan saham'
-          },
-          {
-            id: 'gemini-3.6-flash',
-            name: 'Gemini 3.6 Flash',
-            badge: 'Agentic Mode',
-            badgeClass: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-            desc: 'Dioptimalkan untuk eksekusi otomatis agen dan pengambilan keputusan cepat'
-          },
-          {
-            id: 'gemini-3.5-flash-lite',
-            name: 'Gemini 3.5 Flash-Lite',
-            badge: 'Hemat Token',
-            badgeClass: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
-            desc: 'Super ringan dan hemat kuota token API rate-limit'
-          },
-          {
-            id: 'gemini-3.1-pro',
-            name: 'Gemini 3.1 Pro',
-            badge: 'Deep Reasoning',
-            badgeClass: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
-            desc: 'Kecerdasan tertinggi untuk kalkulasi risiko kompleks & analisis mendalam'
-          },
-          {
-            id: 'gemini-3-flash',
-            name: 'Gemini 3 Flash',
-            badge: 'Pro Intel Flash',
-            badgeClass: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30',
-            desc: 'Kecerdasan level Pro dengan kecepatan transmisi seri Flash'
-          },
-          {
-            id: 'gemini-2.5-pro',
-            name: 'Gemini 2.5 Pro',
-            badge: 'Stable Reasoning',
-            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
-            desc: 'Flagship reasoning generasi 2.5 yang stabil dan teruji'
-          },
-          {
-            id: 'gemini-2.5-flash',
-            name: 'Gemini 2.5 Flash',
-            badge: 'Speed Previous Gen',
-            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
-            desc: 'Performa kecepatan tinggi generasi 2.5'
-          },
-          {
-            id: 'gemini-2.0-flash',
-            name: 'Gemini 2.0 Flash',
-            badge: 'Standard GA',
-            badgeClass: 'bg-slate-700/50 text-slate-300 border border-slate-600',
-            desc: 'Versi standar general availability untuk penggunaan umum'
-          }
-        ],
+            {
+              id: 'gemini-flash-latest',
+              name: 'Gemini Flash Latest',
+              badge: 'Stabil & Cepat',
+              badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+              desc: 'Model flagship resmi tercepat & paling stabil untuk eksekusi live saham IDX'
+            },
+            {
+              id: 'gemini-3.8-flash',
+              name: 'Gemini 3.8 Flash',
+              badge: 'Next-Gen Ultra',
+              badgeClass: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+              desc: 'Throughput ultra tinggi dan respons instan pemindaian sinyal pasar'
+            },
+            {
+              id: 'gemini-3.7-flash',
+              name: 'Gemini 3.7 Flash',
+              badge: 'Hybrid Thinking',
+              badgeClass: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30',
+              desc: 'Penalaran mendalam untuk mendeteksi jebakan fake bid / distribusi bandar'
+            },
+            {
+              id: 'gemini-3.6-flash',
+              name: 'Gemini 3.6 Flash',
+              badge: 'Agentic Mode',
+              badgeClass: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
+              desc: 'Dioptimalkan untuk eksekusi multi-faktor dan pengambilan keputusan agen'
+            },
+            {
+              id: 'gemini-flash-lite-latest',
+              name: 'Gemini Flash-Lite Latest',
+              badge: 'Hemat Kuota',
+              badgeClass: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
+              desc: 'Super ringan, hemat kuota token dan bebas limit bottleneck'
+            },
+            {
+              id: 'gemini-pro-latest',
+              name: 'Gemini Pro Latest',
+              badge: 'Deep Reasoning',
+              badgeClass: 'bg-amber-500/20 text-amber-300 border border-amber-500/30',
+              desc: 'Kecerdasan tertinggi untuk evaluasi pasca-trade & kalkulasi risiko kompleks'
+            }
+          ],
 
         getSelectedModel() {
           const current = this.geminiModels.find(m => m.id === this.formSettings.gemini_model);
@@ -1290,16 +1269,14 @@
           ai_memories: [],
           screener_signals: [],
           gemini_quota: {
-            daily_used: 0,
-            daily_max: 1500,
-            daily_remaining: 1500,
-            daily_remaining_pct: 100,
-            daily_subtext: 'Terpakai 0 dari 1,500 request harian. Refresh penuh dalam 15 jam.',
-            rpm_used: 0,
-            rpm_max: 15,
-            rpm_remaining_pct: 100,
-            rpm_subtext: '0 dari 15 RPM terpakai. Rolling window 60 detik siap melayani.',
-            reset_in: '15 jam',
+            weekly_used: 0,
+            weekly_max: 7000,
+            weekly_remaining_pct: 82,
+            weekly_subtext: 'You have used some of your weekly limit, it will fully refresh in 5 days, 14 hours.',
+            five_hour_used: 0,
+            five_hour_max: 300,
+            five_hour_remaining_pct: 96,
+            five_hour_subtext: 'You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.',
             status_text: 'Optimal (100%)'
           },
           settings: {}
@@ -1331,7 +1308,7 @@
         formSettings: {
           trading_pin: '',
           gemini_api_key: '',
-          gemini_model: 'gemini-3.7-flash',
+          gemini_model: 'gemini-flash-latest',
           ai_reasoning_enabled: true,
           capital_per_strategy: 9000000,
           telegram_enabled: false,

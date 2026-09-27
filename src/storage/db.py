@@ -1,10 +1,12 @@
-﻿import sqlite3
+# -*- coding: utf-8 -*-
+import sqlite3
 import os
 import json
 from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 
-DB_DIR = os.path.abspath("data")
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DB_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.path.join(DB_DIR, "alugara.db")
 
 def get_db_connection():
@@ -97,6 +99,20 @@ def init_db():
         token TEXT PRIMARY KEY,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         expires_at TEXT NOT NULL
+    )
+    """)
+
+    # Table 6: AI Usage Logs & Quota Tracking
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ai_usage_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        model TEXT NOT NULL,
+        prompt_tokens INTEGER DEFAULT 0,
+        response_tokens INTEGER DEFAULT 0,
+        total_tokens INTEGER DEFAULT 0,
+        status_code INTEGER DEFAULT 200,
+        is_success INTEGER DEFAULT 1,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
     )
     """)
 
@@ -274,35 +290,68 @@ def log_ai_usage(model: str, prompt_tokens: int = 0, response_tokens: int = 0, s
         print(f"Error logging AI usage: {e}")
 
 def get_ai_quota_stats() -> Dict[str, Any]:
-    """Menghitung rincian kuota Gemini (Daily Limit RPD, Rate Limit RPM, dan Countdown Reset)"""
+    """
+    Menghitung rincian kuota Gemini bergaya Antigravity IDE:
+    1. Weekly Limit Remaining (7-day window & countdown)
+    2. Five Hour Limit Remaining (5-hour rolling window & countdown)
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
         now_utc = datetime.now(timezone.utc)
-        today_start_utc = now_utc.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-        tomorrow_start_utc = (now_utc.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1))
         
-        # Hitung waktu reset (00:00 UTC = 07:00 WIB)
-        diff = tomorrow_start_utc - now_utc
-        hours_to_reset = diff.seconds // 3600
-        minutes_to_reset = (diff.seconds % 3600) // 60
-        reset_text = f"{hours_to_reset} jam, {minutes_to_reset:02d} menit"
+        # 1. Weekly Limit (7 Days Rolling Window)
+        seven_days_ago = (now_utc - timedelta(days=7)).isoformat()
+        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (seven_days_ago,))
+        weekly_used = cursor.fetchone()[0] or 0
+        weekly_max = 7000  # Standar kapasitas mingguan
+        weekly_remaining = max(0, weekly_max - weekly_used)
+        weekly_remaining_pct = max(0, min(100, round((weekly_remaining / weekly_max) * 100)))
 
-        # 1. Daily Limit (RPD - Requests Per Day) Standard Free Tier = 1,500 RPD
-        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (today_start_utc,))
-        daily_used = cursor.fetchone()[0] or 0
-        daily_max = 1500
-        daily_remaining = max(0, daily_max - daily_used)
-        daily_remaining_pct = max(0, min(100, round((daily_remaining / daily_max) * 100)))
+        # Weekly Refresh Countdown: Menghitung sisa hari & jam menuju refresh mingguan (reset setiap Senin 00:00 UTC)
+        days_ahead = (7 - now_utc.weekday()) % 7
+        if days_ahead == 0 and now_utc.hour >= 0:
+            days_ahead = 7
+        weekly_reset_dt = (now_utc + timedelta(days=days_ahead)).replace(hour=0, minute=0, second=0, microsecond=0)
+        weekly_diff = weekly_reset_dt - now_utc
+        weekly_days_left = weekly_diff.days
+        weekly_hours_left = weekly_diff.seconds // 3600
+        
+        if weekly_used > 0:
+            weekly_subtext = f"You have used some of your weekly limit, it will fully refresh in {weekly_days_left} days, {weekly_hours_left} hours."
+        else:
+            weekly_subtext = f"You have full weekly limit available, it will refresh in {weekly_days_left} days, {weekly_hours_left} hours."
 
-        # 2. Per-Minute Rate Limit (RPM) Standard Free Tier = 15 RPM (Rolling 60s)
-        sixty_sec_ago = (now_utc - timedelta(seconds=60)).isoformat()
-        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (sixty_sec_ago,))
-        rpm_used = cursor.fetchone()[0] or 0
-        rpm_max = 15
-        rpm_remaining = max(0, rpm_max - rpm_used)
-        rpm_remaining_pct = max(0, min(100, round((rpm_remaining / rpm_max) * 100)))
+        # 2. Five Hour Limit (5-Hour Rolling Window)
+        five_hours_ago = (now_utc - timedelta(hours=5)).isoformat()
+        cursor.execute("SELECT COUNT(*) FROM ai_usage_logs WHERE created_at >= ?", (five_hours_ago,))
+        five_hour_used = cursor.fetchone()[0] or 0
+        five_hour_max = 300  # Standar kapasitas 5-jam
+        five_hour_remaining = max(0, five_hour_max - five_hour_used)
+        five_hour_remaining_pct = max(0, min(100, round((five_hour_remaining / five_hour_max) * 100)))
+
+        # Cari call tertua dalam 5 jam terakhir untuk hitung countdown persis
+        cursor.execute("SELECT created_at FROM ai_usage_logs WHERE created_at >= ? ORDER BY id ASC LIMIT 1", (five_hours_ago,))
+        oldest_call_row = cursor.fetchone()
+        if oldest_call_row and oldest_call_row[0]:
+            try:
+                oldest_dt = datetime.fromisoformat(oldest_call_row[0])
+                if oldest_dt.tzinfo is None:
+                    oldest_dt = oldest_dt.replace(tzinfo=timezone.utc)
+                five_hour_reset_dt = oldest_dt + timedelta(hours=5)
+                five_diff = max(timedelta(0), five_hour_reset_dt - now_utc)
+                five_hours_left = five_diff.seconds // 3600
+                five_mins_left = (five_diff.seconds % 3600) // 60
+            except Exception:
+                five_hours_left, five_mins_left = 4, 50
+        else:
+            five_hours_left, five_mins_left = 4, 50
+
+        if five_hour_used > 0:
+            five_hour_subtext = f"You have used some of your 5-hour limit, it will fully refresh in {five_hours_left} hours, {five_mins_left:02d} minutes."
+        else:
+            five_hour_subtext = f"You have full 5-hour limit available, next window in {five_hours_left} hours, {five_mins_left:02d} minutes."
 
         # 3. Total Tokens & Total Calls
         cursor.execute("SELECT SUM(total_tokens), COUNT(*) FROM ai_usage_logs")
@@ -313,35 +362,31 @@ def get_ai_quota_stats() -> Dict[str, Any]:
         conn.close()
 
         status_text = "Optimal (100%)"
-        if rpm_remaining_pct < 20 or daily_remaining_pct < 10:
+        if five_hour_remaining_pct < 20 or weekly_remaining_pct < 20:
             status_text = "High Usage"
-        elif daily_remaining_pct < 5:
+        elif five_hour_remaining_pct < 10 or weekly_remaining_pct < 10:
             status_text = "Quota Low"
-
-        daily_subtext = f"Terpakai {daily_used:,} dari {daily_max:,} request. Refresh penuh dalam {reset_text}."
-        rpm_subtext = f"{rpm_used} dari {rpm_max} RPM aktif. Rolling window 60 detik siap melayani."
+        else:
+            status_text = f"Optimal ({five_hour_remaining_pct}%)"
 
         return {
-            "daily_used": daily_used,
-            "daily_max": daily_max,
-            "daily_remaining": daily_remaining,
-            "daily_remaining_pct": daily_remaining_pct,
-            "daily_subtext": daily_subtext,
-            "rpm_used": rpm_used,
-            "rpm_max": rpm_max,
-            "rpm_remaining_pct": rpm_remaining_pct,
-            "rpm_subtext": rpm_subtext,
-            "reset_in": reset_text,
+            "weekly_used": weekly_used,
+            "weekly_max": weekly_max,
+            "weekly_remaining_pct": weekly_remaining_pct,
+            "weekly_subtext": weekly_subtext,
+            "five_hour_used": five_hour_used,
+            "five_hour_max": five_hour_max,
+            "five_hour_remaining_pct": five_hour_remaining_pct,
+            "five_hour_subtext": five_hour_subtext,
             "all_time_calls": all_time_calls,
             "all_time_tokens": all_time_tokens,
             "status_text": status_text
         }
     except Exception as e:
         return {
-            "daily_remaining_pct": 100,
-            "daily_subtext": "Monitoring kuota aktif (1,500 RPD).",
-            "rpm_remaining_pct": 100,
-            "rpm_subtext": "15 RPM rolling rate limit.",
-            "reset_in": "24 jam",
-            "status_text": "Optimal"
+            "weekly_remaining_pct": 100,
+            "weekly_subtext": "You have full weekly limit available, it will refresh in 5 days, 14 hours.",
+            "five_hour_remaining_pct": 100,
+            "five_hour_subtext": "You have full 5-hour limit available, next window in 4 hours, 50 minutes.",
+            "status_text": "Optimal (100%)"
         }

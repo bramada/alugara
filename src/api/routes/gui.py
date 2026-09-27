@@ -94,6 +94,7 @@ async def get_gui_dashboard_status():
         "recent_trades": logs,
         "ai_memories": ai_memories,
         "screener_signals": signals,
+        "gemini_quota": get_ai_quota_stats(),
         "settings": {
             "trading_pin": "****" if stored_pin else "",
             "gemini_api_key": stored_gemini or "",
@@ -251,3 +252,11 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
                 return {"success": False, "message": f"❌ Gagal mengirim ke Telegram: {err_desc}"}
     except Exception as e:
         return {"success": False, "message": f"❌ Error koneksi: {e}"}
+
+@router.get("/quota")
+async def get_gemini_quota_endpoint():
+    """Mengambil metrik kuota AI Gemini real-time bergaya Antigravity IDE"""
+    return {
+        "success": True,
+        "gemini_quota": get_ai_quota_stats()
+    }
