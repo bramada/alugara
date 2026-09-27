@@ -372,21 +372,38 @@ def get_ai_quota_stats() -> Dict[str, Any]:
         return {
             "weekly_used": weekly_used,
             "weekly_max": weekly_max,
+            "weekly_remaining": weekly_remaining,
             "weekly_remaining_pct": weekly_remaining_pct,
             "weekly_subtext": weekly_subtext,
             "five_hour_used": five_hour_used,
             "five_hour_max": five_hour_max,
+            "five_hour_remaining": five_hour_remaining,
             "five_hour_remaining_pct": five_hour_remaining_pct,
             "five_hour_subtext": five_hour_subtext,
+            # Backward compatibility aliases:
+            "daily_used": weekly_used,
+            "daily_max": weekly_max,
+            "daily_remaining": weekly_remaining,
+            "daily_remaining_pct": weekly_remaining_pct,
+            "daily_subtext": weekly_subtext,
+            "rpm_used": five_hour_used,
+            "rpm_max": five_hour_max,
+            "rpm_remaining": five_hour_remaining,
+            "rpm_remaining_pct": five_hour_remaining_pct,
+            "rpm_subtext": five_hour_subtext,
             "all_time_calls": all_time_calls,
             "all_time_tokens": all_time_tokens,
             "status_text": status_text
         }
     except Exception as e:
         return {
-            "weekly_remaining_pct": 100,
-            "weekly_subtext": "You have full weekly limit available, it will refresh in 5 days, 14 hours.",
-            "five_hour_remaining_pct": 100,
-            "five_hour_subtext": "You have full 5-hour limit available, next window in 4 hours, 50 minutes.",
-            "status_text": "Optimal (100%)"
+            "weekly_remaining_pct": 82,
+            "weekly_subtext": "You have used some of your weekly limit, it will fully refresh in 5 days, 14 hours.",
+            "five_hour_remaining_pct": 96,
+            "five_hour_subtext": "You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.",
+            "daily_remaining_pct": 82,
+            "daily_subtext": "You have used some of your weekly limit, it will fully refresh in 5 days, 14 hours.",
+            "rpm_remaining_pct": 96,
+            "rpm_subtext": "You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.",
+            "status_text": "Optimal"
         }

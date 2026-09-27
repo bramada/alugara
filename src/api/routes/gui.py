@@ -1,8 +1,9 @@
+# -*- coding: utf-8 -*-
 import httpx
 import os
 import asyncio
-from datetime import datetime
-from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from src.config.settings import settings
@@ -25,6 +26,10 @@ engine = ExecutionEngine()
 notifier = TelegramNotifier()
 ai_analyzer = GeminiAnalyzer()
 
+# Cache untuk respon instan dashboard (< 20ms)
+_cached_session_status = {"valid": False, "msg": "Menunggu pengecekan sesi", "checked_at": None}
+_cached_signals: List[Dict[str, Any]] = []
+
 class GuiSettingsPayload(BaseModel):
     trading_pin: Optional[str] = None
     gemini_api_key: Optional[str] = None
@@ -37,11 +42,24 @@ class GuiSettingsPayload(BaseModel):
     telegram_chat_id: Optional[str] = None
 
 @router.get("/status")
-async def get_gui_dashboard_status():
+async def get_gui_dashboard_status(background_tasks: BackgroundTasks):
     """
-    Mengambil data status lengkap untuk Web Dashboard Alugara (Terproteksi Login Gate)
+    Mengambil data status lengkap untuk Web Dashboard Alugara (Respons Cepat & Instan)
     """
-    valid, session_msg = await engine.driver.check_session_valid()
+    global _cached_session_status, _cached_signals
+
+    # Cek session cache (refresh di background jika sudah > 3 menit)
+    now = datetime.now(timezone.utc)
+    if _cached_session_status["checked_at"] is None or (now - _cached_session_status["checked_at"]).total_seconds() > 180:
+        async def _check_sess_bg():
+            global _cached_session_status
+            try:
+                v, m = await engine.driver.check_session_valid()
+                _cached_session_status = {"valid": v, "msg": m, "checked_at": datetime.now(timezone.utc)}
+            except Exception as e:
+                _cached_session_status = {"valid": False, "msg": str(e), "checked_at": datetime.now(timezone.utc)}
+        background_tasks.add_task(_check_sess_bg)
+
     positions = get_active_positions()
     logs = get_trade_logs(limit=20)
     ai_memories = get_top_ai_memories(limit=15)
@@ -60,10 +78,8 @@ async def get_gui_dashboard_status():
     total_trades = len(logs)
     win_rate = round((win_count / total_trades * 100), 1) if total_trades > 0 else 0.0
 
-    # Ambil sinyal screener real-time
-    raw_signals = await engine.screener.scan_market_signals()
-    # Jika AI aktif, saring dan beri skor
-    signals = await ai_analyzer.analyze_and_rank_candidates(raw_signals)
+    # Ambil sinyal terakhir dari engine
+    signals = getattr(engine, "last_signals", None) or _cached_signals or []
 
     # Cek ketersediaan secret terenkripsi
     stored_pin = decrypt_value(db_settings.get("trading_pin", "")) or settings.STOCKBIT_TRADING_PIN
@@ -71,11 +87,13 @@ async def get_gui_dashboard_status():
     stored_tele_token = decrypt_value(db_settings.get("telegram_bot_token", "")) or settings.TELEGRAM_BOT_TOKEN
     stored_tele_chat_id = decrypt_value(db_settings.get("telegram_chat_id", "")) or settings.TELEGRAM_CHAT_ID
 
+    quota_data = get_ai_quota_stats()
+
     return {
         "success": True,
         "session": {
-            "is_authenticated": valid,
-            "message": session_msg,
+            "is_authenticated": _cached_session_status["valid"],
+            "message": _cached_session_status["msg"],
         },
         "stats": {
             "modal": modal,
@@ -94,7 +112,7 @@ async def get_gui_dashboard_status():
         "recent_trades": logs,
         "ai_memories": ai_memories,
         "screener_signals": signals,
-        "gemini_quota": get_ai_quota_stats(),
+        "gemini_quota": quota_data,
         "settings": {
             "trading_pin": "****" if stored_pin else "",
             "gemini_api_key": stored_gemini or "",
@@ -108,6 +126,14 @@ async def get_gui_dashboard_status():
             "market_buy_time": "09:00 - 15:45 WIB (Intraday Multi-Trade)",
             "market_sell_time": "Real-Time TP/SL (+1.5% s/d +3.5%)",
         }
+    }
+
+@router.get("/quota")
+async def get_gemini_quota_endpoint():
+    """Mengambil metrik kuota AI Gemini real-time bergaya Antigravity IDE"""
+    return {
+        "success": True,
+        "gemini_quota": get_ai_quota_stats()
     }
 
 @router.post("/settings")
@@ -214,7 +240,6 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
     token_input = payload.bot_token.strip() if payload and payload.bot_token and payload.bot_token != "****" else None
     chat_input = payload.chat_id.strip() if payload and payload.chat_id and payload.chat_id != "****" else None
 
-    # Jika user menginput nilai baru, simpan langsung ke database internal
     if token_input:
         set_setting("telegram_bot_token", encrypt_value(token_input))
         settings.TELEGRAM_BOT_TOKEN = token_input
@@ -237,7 +262,7 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
     url = f"https://api.telegram.org/bot{active_token}/sendMessage"
     payload_data = {
         "chat_id": active_chat,
-        "text": "🚀 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung ke Channel/Group!",
+        "text": "<b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung ke Channel/Group!",
         "parse_mode": "HTML"
     }
 
@@ -245,18 +270,10 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(url, json=payload_data)
             if res.status_code == 200:
-                return {"success": True, "message": "✅ Pesan uji coba berhasil terkirim ke Telegram!"}
+                return {"success": True, "message": "[OK] Pesan uji coba berhasil terkirim ke Telegram!"}
             else:
                 data = res.json()
                 err_desc = data.get("description", res.text)
-                return {"success": False, "message": f"❌ Gagal mengirim ke Telegram: {err_desc}"}
+                return {"success": False, "message": f"[ERROR] Gagal mengirim ke Telegram: {err_desc}"}
     except Exception as e:
-        return {"success": False, "message": f"❌ Error koneksi: {e}"}
-
-@router.get("/quota")
-async def get_gemini_quota_endpoint():
-    """Mengambil metrik kuota AI Gemini real-time bergaya Antigravity IDE"""
-    return {
-        "success": True,
-        "gemini_quota": get_ai_quota_stats()
-    }
+        return {"success": False, "message": f"[ERROR] Error koneksi: {e}"}

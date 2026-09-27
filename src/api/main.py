@@ -62,7 +62,14 @@ async def serve_gui_dashboard():
     """Menyajikan antarmuka Web Dashboard Alugara"""
     index_path = os.path.join(os.path.dirname(__file__), "..", "static", "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            }
+        )
     return {
         "service": "Alugara Auto-Trading Engine",
         "status": "ONLINE",

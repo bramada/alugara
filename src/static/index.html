@@ -783,13 +783,13 @@
                     <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.weekly_subtext : 'You have used some of your weekly limit, it will fully refresh in 5 days, 14 hours.'"></p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.weekly_remaining_pct + '%') : '82%'"></span>
+                    <span class="text-xs font-bold font-mono text-white" x-text="(status.gemini_quota ? (status.gemini_quota.weekly_remaining_pct ?? status.gemini_quota.daily_remaining_pct ?? 82) : 82) + '%'"></span>
                     <!-- Circular Progress Ring -->
                     <div class="relative w-8 h-8 flex items-center justify-center">
                       <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
                         <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         <path class="text-emerald-400 transition-all duration-500"
-                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.weekly_remaining_pct : 82}, 100`"
+                              :stroke-dasharray="`${status.gemini_quota ? (status.gemini_quota.weekly_remaining_pct ?? status.gemini_quota.daily_remaining_pct ?? 82) : 82}, 100`"
                               stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       </svg>
@@ -804,13 +804,13 @@
                     <p class="text-[11px] text-slate-400 leading-snug" x-text="status.gemini_quota ? status.gemini_quota.five_hour_subtext : 'You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.'"></p>
                   </div>
                   <div class="flex items-center gap-3 flex-shrink-0">
-                    <span class="text-xs font-bold font-mono text-white" x-text="status.gemini_quota ? (status.gemini_quota.five_hour_remaining_pct + '%') : '96%'"></span>
+                    <span class="text-xs font-bold font-mono text-white" x-text="(status.gemini_quota ? (status.gemini_quota.five_hour_remaining_pct ?? status.gemini_quota.rpm_remaining_pct ?? 96) : 96) + '%'"></span>
                     <!-- Circular Progress Ring -->
                     <div class="relative w-8 h-8 flex items-center justify-center">
                       <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
                         <path class="text-slate-800" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                         <path class="text-emerald-400 transition-all duration-500"
-                              :stroke-dasharray="`${status.gemini_quota ? status.gemini_quota.five_hour_remaining_pct : 96}, 100`"
+                              :stroke-dasharray="`${status.gemini_quota ? (status.gemini_quota.five_hour_remaining_pct ?? status.gemini_quota.rpm_remaining_pct ?? 96) : 96}, 100`"
                               stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none"
                               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                       </svg>
