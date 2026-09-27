@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  alugara:
+    build: .
+    container_name: alugara-engine
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sessions:/app/sessions
+      - ./screenshots:/app/screenshots
+      - ./logs:/app/logs
+      - ./.env:/app/.env
+    environment:
+      - TZ=Asia/Jakarta
