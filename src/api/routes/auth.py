@@ -1,9 +1,10 @@
-﻿from fastapi import APIRouter, HTTPException, Depends, Response, Request
+from fastapi import APIRouter, HTTPException, Depends, Response, Request
 from pydantic import BaseModel
 from typing import Optional
 from src.core.security import (
     is_master_password_configured,
-    set_master_password,
+    set_user_credentials,
+    verify_user_credentials,
     verify_master_password,
     create_user_session,
     validate_user_session,
@@ -11,14 +12,17 @@ from src.core.security import (
     get_auth_token_from_request,
     require_auth
 )
+from src.storage.db import get_setting
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Security & Authentication"])
 
 class SetupPayload(BaseModel):
+    username: str
     password: str
     confirm_password: str
 
 class LoginPayload(BaseModel):
+    username: str
     password: str
     remember: bool = True
 
@@ -29,30 +33,39 @@ class ChangePasswordPayload(BaseModel):
 
 @router.get("/status")
 async def get_auth_status(request: Request):
-    """Cek status konfigurasi master password dan autentikasi sesi saat ini"""
+    """Cek status konfigurasi akun dan autentikasi sesi saat ini"""
     configured = is_master_password_configured()
     token = get_auth_token_from_request(request)
     authenticated = bool(token and validate_user_session(token))
+    saved_user = get_setting("auth_username") if configured else None
 
     return {
         "is_configured": configured,
         "is_authenticated": authenticated,
-        "message": "Autentikasi aktif" if authenticated else ("Harap login" if configured else "Buat Master Password")
+        "username": saved_user if authenticated else None,
+        "message": "Autentikasi aktif" if authenticated else ("Harap login" if configured else "Buat Akun")
     }
 
 @router.post("/setup")
-async def setup_master_password(payload: SetupPayload, response: Response):
-    """Setup Master Password / PIN pertama kali saat aplikasi dibuka"""
+async def setup_account(payload: SetupPayload, response: Response):
+    """Setup Username & Password pertama kali saat aplikasi dibuka"""
     if is_master_password_configured():
         raise HTTPException(
             status_code=400,
-            detail="Master Password sudah dikonfigurasi. Silakan login."
+            detail="Akun sudah dikonfigurasi. Silakan login."
+        )
+
+    clean_user = payload.username.strip()
+    if len(clean_user) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="Username minimal 2 karakter."
         )
 
     if len(payload.password) < 4:
         raise HTTPException(
             status_code=400,
-            detail="Password minimal 4 karakter (atau 6 digit PIN)."
+            detail="Password minimal 4 karakter."
         )
 
     if payload.password != payload.confirm_password:
@@ -61,10 +74,9 @@ async def setup_master_password(payload: SetupPayload, response: Response):
             detail="Konfirmasi password tidak cocok."
         )
 
-    set_master_password(payload.password)
+    set_user_credentials(clean_user, payload.password)
     token, expires_at = create_user_session(remember=True)
 
-    # Set cookie HttpOnly
     response.set_cookie(
         key="alugara_session",
         value=token,
@@ -77,22 +89,24 @@ async def setup_master_password(payload: SetupPayload, response: Response):
     return {
         "success": True,
         "token": token,
-        "message": "Master Password berhasil dibuat! Selamat datang di Alugara."
+        "username": clean_user,
+        "message": "Akun berhasil dibuat! Selamat datang di Alugara."
     }
 
 @router.post("/login")
 async def login(payload: LoginPayload, response: Response):
-    """Verifikasi Master Password untuk membuka akses Dashboard Alugara"""
+    """Verifikasi Username & Password untuk membuka akses Dashboard Alugara"""
     if not is_master_password_configured():
         raise HTTPException(
             status_code=400,
-            detail="Aplikasi belum memiliki Master Password. Silakan setup terlebih dahulu."
+            detail="Aplikasi belum memiliki akun. Silakan buat akun terlebih dahulu."
         )
 
-    if not verify_master_password(payload.password):
+    clean_user = payload.username.strip()
+    if not verify_user_credentials(clean_user, payload.password):
         raise HTTPException(
             status_code=401,
-            detail="Master Password / PIN salah! Akses ditolak."
+            detail="Username atau Password salah! Akses ditolak."
         )
 
     token, expires_at = create_user_session(remember=payload.remember)
@@ -110,6 +124,7 @@ async def login(payload: LoginPayload, response: Response):
     return {
         "success": True,
         "token": token,
+        "username": clean_user,
         "message": "Login berhasil! Dashboard terbuka."
     }
 
@@ -128,7 +143,7 @@ async def logout(request: Request, response: Response):
 
 @router.post("/change-password")
 async def change_password(payload: ChangePasswordPayload, token: str = Depends(require_auth)):
-    """Mengubah Master Password yang sedang aktif"""
+    """Mengubah Password yang sedang aktif"""
     if not verify_master_password(payload.current_password):
         raise HTTPException(
             status_code=401,
@@ -147,8 +162,9 @@ async def change_password(payload: ChangePasswordPayload, token: str = Depends(r
             detail="Konfirmasi password baru tidak cocok."
         )
 
-    set_master_password(payload.new_password)
+    username = get_setting("auth_username") or "admin"
+    set_user_credentials(username, payload.new_password)
     return {
         "success": True,
-        "message": "Master Password berhasil diperbarui!"
+        "message": "Password berhasil diperbarui!"
     }

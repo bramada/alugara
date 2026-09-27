@@ -1,4 +1,4 @@
-﻿import os
+import os
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -52,12 +52,13 @@ def decrypt_value(cipher_text: str) -> str:
         return ""
 
 def is_master_password_configured() -> bool:
-    """Memeriksa apakah Master Password / PIN aplikasi sudah dibuat"""
+    """Memeriksa apakah akun (username & password) sudah dibuat"""
+    username = get_setting("auth_username")
     pwd_hash = get_setting("auth_password_hash")
-    return bool(pwd_hash and len(pwd_hash) > 10)
+    return bool(username and pwd_hash and len(pwd_hash) > 10)
 
-def set_master_password(password: str) -> bool:
-    """Menyimpan Master Password dengan PBKDF2-HMAC-SHA256 (100,000 iterasi + salt)"""
+def set_user_credentials(username: str, password: str) -> bool:
+    """Menyimpan Username & Password dengan PBKDF2-HMAC-SHA256 (100,000 iterasi + salt)"""
     salt = secrets.token_hex(16)
     pwd_hash = hashlib.pbkdf2_hmac(
         'sha256',
@@ -65,12 +66,32 @@ def set_master_password(password: str) -> bool:
         salt.encode('utf-8'),
         100_000
     ).hex()
+    set_setting("auth_username", username.strip())
     set_setting("auth_password_hash", pwd_hash)
     set_setting("auth_password_salt", salt)
     return True
 
+def verify_user_credentials(username: str, password: str) -> bool:
+    """Verifikasi kombinasi Username dan Password"""
+    stored_username = get_setting("auth_username")
+    stored_hash = get_setting("auth_password_hash")
+    salt = get_setting("auth_password_salt")
+    if not stored_username or not stored_hash or not salt:
+        return False
+
+    if username.strip().lower() != stored_username.strip().lower():
+        return False
+
+    computed_hash = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt.encode('utf-8'),
+        100_000
+    ).hex()
+    return secrets.compare_digest(computed_hash, stored_hash)
+
 def verify_master_password(password: str) -> bool:
-    """Verifikasi Master Password yang dimasukkan trader"""
+    """Verifikasi Password saat ini (untuk penggantian password di settings)"""
     stored_hash = get_setting("auth_password_hash")
     salt = get_setting("auth_password_salt")
     if not stored_hash or not salt:
@@ -112,6 +133,10 @@ def validate_user_session(token: str) -> bool:
         delete_session(token)
         return False
 
+def delete_user_session(token: str):
+    """Menghapus sesi token autentikasi (logout)"""
+    delete_session(token)
+
 def get_auth_token_from_request(request: Request) -> Optional[str]:
     """Mengekstrak token autentikasi dari Header atau Cookie"""
     auth_header = request.headers.get("Authorization")
@@ -133,7 +158,7 @@ async def require_auth(request: Request) -> str:
     if not is_master_password_configured():
         raise HTTPException(
             status_code=401,
-            detail="Aplikasi belum dikonfigurasi. Silakan buat Master Password terlebih dahulu."
+            detail="Aplikasi belum memiliki akun. Silakan setup akun terlebih dahulu."
         )
 
     token = get_auth_token_from_request(request)
@@ -143,6 +168,3 @@ async def require_auth(request: Request) -> str:
             detail="Sesi tidak valid atau telah kedaluwarsa. Silakan login kembali."
         )
     return token
-def delete_user_session(token: str):
-    """Menghapus sesi token autentikasi (logout)"""
-    delete_session(token)

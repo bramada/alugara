@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Alugara — Autonomous Stock Trading Engine with Gemini AI</title>
+  <title>ALUGARA</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,7 +43,7 @@
 <body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" x-data="alugaraApp()" x-init="initDashboard()" x-cloak>
 
   <!-- ========================================== -->
-  <!-- 1. LOGIN & SETUP SECURITY GATE OVERLAY     -->
+  <!-- 1. LOGIN & SETUP OVERLAY                  -->
   <!-- ========================================== -->
   <div x-show="!auth.is_authenticated" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070b14]/95 backdrop-blur-2xl">
     
@@ -54,22 +54,9 @@
 
     <div class="relative w-full max-w-md glass-card rounded-3xl p-7 sm:p-9 shadow-2xl shadow-emerald-950/40 border border-slate-700/80">
       
-      <!-- Brand Header -->
-      <div class="text-center space-y-3 mb-7">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-blue-600 to-cyan-500 text-white shadow-xl shadow-purple-500/30">
-          <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-          </svg>
-        </div>
-        <div>
-          <h1 class="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
-            <span>ALUGARA</span>
-            <span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black tracking-widest uppercase">
-              SECURITY GATE
-            </span>
-          </h1>
-          <p class="text-xs text-slate-400 mt-1 font-medium">Autonomous Trading Engine for IDX with Gemini AI</p>
-        </div>
+      <!-- Brand Header: HANYA TULISAN ALUGARA -->
+      <div class="text-center mb-6">
+        <h1 class="text-2xl sm:text-3xl font-black tracking-wider text-white select-none">ALUGARA</h1>
       </div>
 
       <!-- Feedback Alert -->
@@ -90,25 +77,33 @@
       <!-- FORM 1: SETUP FIRST TIME -->
       <template x-if="!auth.is_configured && !auth.loading">
         <form @submit.prevent="handleSetup()" class="space-y-4">
-          <div class="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-purple-200 text-xs leading-relaxed">
-            <span class="font-bold text-white block mb-0.5">🔒 Setup Master Password Pertama Kali</span>
-            Buat Master Password untuk mengunci akses dashboard Alugara dan mengenkripsi API Key & Trading PIN Anda dengan aman di database lokal.
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Username</label>
+            <input type="text" x-model="auth.setup_username" required autofocus
+                   placeholder="Masukkan username"
+                   class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400">
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Master Password / PIN Baru</label>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
             <div class="relative">
               <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.setup_password" required
-                     placeholder="Minimal 4 karakter atau 6 digit PIN"
+                     placeholder="Minimal 4 karakter"
                      class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 pr-10">
-              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white">
-                <span x-text="auth.show_password ? '🙈' : '👁️'"></span>
+              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white transition-colors" title="Toggle Password">
+                <svg x-show="!auth.show_password" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <svg x-show="auth.show_password" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                </svg>
               </button>
             </div>
           </div>
 
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Konfirmasi Master Password</label>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Konfirmasi Password</label>
             <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.setup_confirm_password" required
                    placeholder="Ketik ulang password"
                    class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400">
@@ -116,7 +111,7 @@
 
           <button type="submit" :disabled="auth.submitting"
                   class="w-full mt-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-purple-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-            <span x-show="!auth.submitting">🚀 Buat Password & Buka Dashboard</span>
+            <span x-show="!auth.submitting">🚀 Buat Akun & Buka Dashboard</span>
             <span x-show="auth.submitting">Menyimpan...</span>
           </button>
         </form>
@@ -126,16 +121,26 @@
       <template x-if="auth.is_configured && !auth.loading">
         <form @submit.prevent="handleLogin()" class="space-y-4">
           <div>
-            <div class="flex items-center justify-between mb-1.5">
-              <label class="block text-xs font-semibold text-slate-300">Master Password / App PIN</label>
-              <span class="text-[11px] text-cyan-400 font-medium">Terenkripsi AES-256</span>
-            </div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Username</label>
+            <input type="text" x-model="auth.login_username" required autofocus
+                   placeholder="Masukkan username"
+                   class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400">
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Password</label>
             <div class="relative">
-              <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.login_password" required autofocus
-                     placeholder="Masukkan Master Password Anda"
+              <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.login_password" required
+                     placeholder="Masukkan password"
                      class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 pr-10">
-              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white">
-                <span x-text="auth.show_password ? '🙈' : '👁️'"></span>
+              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white transition-colors" title="Toggle Password">
+                <svg x-show="!auth.show_password" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                <svg x-show="auth.show_password" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                </svg>
               </button>
             </div>
           </div>
@@ -149,7 +154,7 @@
 
           <button type="submit" :disabled="auth.submitting"
                   class="w-full mt-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-            <span x-show="!auth.submitting">🔓 Buka Dashboard Alugara</span>
+            <span x-show="!auth.submitting">🔓 Masuk</span>
             <span x-show="auth.submitting">Memverifikasi...</span>
           </button>
         </form>
@@ -161,13 +166,7 @@
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
         </svg>
-        <span>Memeriksa status keamanan...</span>
-      </div>
-
-      <div class="mt-6 pt-5 border-t border-slate-800/80 text-center">
-        <p class="text-[11px] text-slate-500">
-          Kredensial disimpan lokal secara terenkripsi di <code class="text-cyan-400">data/alugara.db</code>
-        </p>
+        <span>Memuat...</span>
       </div>
 
     </div>
@@ -179,7 +178,7 @@
   <!-- ========================================== -->
   <div x-show="auth.is_authenticated" class="flex-1 flex flex-col">
 
-    <!-- TOP HEADER NAVBAR -->
+    <!-- TOP HEADER NAVBAR: HANYA TULISAN ALUGARA -->
     <header class="sticky top-0 z-40 glass-card border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
       <div class="flex items-center">
         <h1 class="font-black text-xl sm:text-2xl tracking-wider text-white select-none">ALUGARA</h1>
@@ -514,8 +513,8 @@
       <div x-show="activeTab === 'settings'" class="space-y-6">
         <div class="glass-card rounded-3xl p-6 max-w-3xl mx-auto space-y-6">
           <div>
-            <h2 class="text-lg font-bold text-white">⚙️ Pengaturan Alugara, Keamanan & AI</h2>
-            <p class="text-xs text-slate-400 mt-1">Seluruh kredensial sensitif dienkripsi dengan standar AES-256 dan disimpan di database lokal SQLite.</p>
+            <h2 class="text-lg font-bold text-white">⚙️ Pengaturan Alugara</h2>
+            <p class="text-xs text-slate-400 mt-1">Seluruh konfigurasi tersimpan aman di database internal.</p>
           </div>
 
           <!-- Section 1: Gemini AI Key -->
@@ -562,7 +561,7 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">PIN Trading Stockbit (6 Digit)</label>
-                <input type="password" x-model="formSettings.trading_pin" placeholder="Masukkan 6 Digit PIN (Terenkripsi AES)"
+                <input type="password" x-model="formSettings.trading_pin" placeholder="Masukkan 6 Digit PIN"
                        class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
               </div>
 
@@ -615,10 +614,10 @@
             </button>
           </div>
 
-          <!-- Section 5: Master Password Change -->
+          <!-- Section 5: Password Change -->
           <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
-            <h3 class="text-sm font-bold text-cyan-400">5. Keamanan Master Password Aplikasi</h3>
-            <p class="text-xs text-slate-400">Ganti Master Password / App PIN yang digunakan untuk membuka Dashboard Alugara.</p>
+            <h3 class="text-sm font-bold text-cyan-400">5. Keamanan Password Aplikasi</h3>
+            <p class="text-xs text-slate-400">Ganti Password yang digunakan untuk membuka Dashboard Alugara.</p>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <input type="password" x-model="changePwd.current" placeholder="Password Saat Ini"
@@ -634,7 +633,7 @@
               </div>
             </div>
             <button @click="handleChangePassword()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition-all">
-              🔐 Perbarui Master Password
+              🔐 Perbarui Password
             </button>
           </div>
 
@@ -673,9 +672,11 @@
           success: '',
           show_password: false,
           remember_me: true,
-          login_password: '',
+          setup_username: '',
           setup_password: '',
           setup_confirm_password: '',
+          login_username: '',
+          login_password: '',
         },
 
         changePwd: {
@@ -736,6 +737,10 @@
         async handleSetup() {
           this.auth.error = '';
           this.auth.success = '';
+          if (!this.auth.setup_username || this.auth.setup_username.trim().length < 2) {
+            this.auth.error = 'Username minimal 2 karakter!';
+            return;
+          }
           if (this.auth.setup_password !== this.auth.setup_confirm_password) {
             this.auth.error = 'Konfirmasi password tidak cocok!';
             return;
@@ -751,16 +756,17 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                username: this.auth.setup_username.trim(),
                 password: this.auth.setup_password,
                 confirm_password: this.auth.setup_confirm_password
               })
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.detail || 'Gagal melakukan setup');
+            if (!res.ok) throw new Error(data.detail || 'Gagal membuat akun');
 
             this.auth.is_configured = true;
             this.auth.is_authenticated = true;
-            this.auth.success = 'Setup berhasil! Membuka dashboard...';
+            this.auth.success = 'Akun berhasil dibuat! Membuka dashboard...';
             await this.fetchStatus();
           } catch (err) {
             this.auth.error = err.message;
@@ -772,12 +778,17 @@
         async handleLogin() {
           this.auth.error = '';
           this.auth.success = '';
+          if (!this.auth.login_username || !this.auth.login_password) {
+            this.auth.error = 'Username dan Password wajib diisi!';
+            return;
+          }
           try {
             this.auth.submitting = true;
             const res = await fetch('/api/v1/auth/login', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
+                username: this.auth.login_username.trim(),
                 password: this.auth.login_password,
                 remember: this.auth.remember_me
               })
@@ -827,7 +838,7 @@
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.detail || 'Gagal mengubah password');
-            alert(data.message || 'Master Password berhasil diubah!');
+            alert(data.message || 'Password berhasil diubah!');
             this.changePwd.current = '';
             this.changePwd.new_pwd = '';
             this.changePwd.confirm_pwd = '';
