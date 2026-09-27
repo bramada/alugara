@@ -1,3 +1,4 @@
+import json
 import os
 import asyncio
 from datetime import datetime
@@ -59,27 +60,41 @@ class StockbitDriver:
         """
         Memeriksa apakah sesi login Stockbit saat ini masih aktif dan valid
         """
+        # 1. Cek apakah file sesi stockbit_state.json sudah ada
+        if not os.path.exists(self.state_file):
+            return False, "Belum login. Silakan klik 'Hubungkan / Login Stockbit' di Pengaturan."
+
+        try:
+            with open(self.state_file, "r", encoding="utf-8") as sf:
+                state_data = json.load(sf)
+                cookies = state_data.get("cookies", [])
+                if not cookies:
+                    return False, "File sesi kosong. Silakan login ulang."
+        except Exception:
+            return False, "File sesi tidak valid. Silakan login ulang."
+
+        # 2. Buka browser dan verifikasi login nyata di Stockbit
         async with async_playwright() as p:
             context = await self.get_context(p, headless=True)
             page = await context.new_page()
             try:
-                logger.info("Memeriksa status sesi login Stockbit...")
+                logger.info("Memeriksa status sesi login Stockbit di web...")
                 await page.goto("https://stockbit.com/#/order", timeout=self.timeout_ms, wait_until="domcontentloaded")
-                await asyncio.sleep(3)
+                await asyncio.sleep(2.5)
 
                 current_url = page.url
-                # Jika dialihkan ke halaman login, sesi tidak aktif
                 if "login" in current_url.lower() or "signin" in current_url.lower():
                     await context.close()
-                    return False, "Sesi kedaluwarsa atau belum login."
+                    return False, "Sesi login kedaluwarsa. Silakan login ulang."
 
-                # Cek elemen profil/portofolio
+                # Cek elemen profil user terautentikasi
                 is_logged_in = await page.evaluate("""
                     () => {
                         const avatar = document.querySelector('[data-testid="user-avatar"]') || 
                                        document.querySelector('.header-avatar') ||
                                        document.querySelector('a[href*="/portfolio"]') ||
-                                       document.querySelector('button[aria-label*="Account"]');
+                                       document.querySelector('button[aria-label*="Account"]') ||
+                                       document.querySelector('.user-profile-name');
                         return !!avatar;
                     }
                 """)
@@ -87,7 +102,7 @@ class StockbitDriver:
                 await context.close()
                 if is_logged_in:
                     return True, "Sesi login Stockbit aktif & siap eksekusi."
-                return True, "Sesi aktif (URL Order dapat diakses)."
+                return False, "Belum terautentikasi di Stockbit. Silakan hubungkan akun."
             except Exception as e:
                 await context.close()
                 logger.error(f"Error checking session: {e}")
