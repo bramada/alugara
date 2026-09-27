@@ -1594,7 +1594,14 @@
 
         async testGemini() {
           try {
-            const res = await fetch('/api/v1/gui/test-gemini', { method: 'POST' });
+            const res = await fetch('/api/v1/gui/test-gemini', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                api_key: this.formSettings.gemini_api_key,
+                model: this.formSettings.gemini_model
+              })
+            });
             if (res.status === 401) {
               this.auth.is_authenticated = false;
               return;

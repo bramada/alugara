@@ -20,7 +20,13 @@ class GeminiAnalyzer:
         pass
 
     def get_api_key(self) -> str:
-        return get_setting("gemini_api_key") or settings.GEMINI_API_KEY or ""
+        from src.core.security import decrypt_value
+        stored = get_setting("gemini_api_key")
+        if stored:
+            decrypted = decrypt_value(stored)
+            if decrypted:
+                return decrypted
+        return settings.GEMINI_API_KEY or ""
 
     def get_model(self) -> str:
         return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-3.7-flash"
@@ -29,41 +35,79 @@ class GeminiAnalyzer:
         enabled_setting = get_setting("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED))
         return enabled_setting.lower() == "true" and bool(self.get_api_key())
 
-    async def call_gemini(self, prompt: str) -> Optional[str]:
-        api_key = self.get_api_key()
-        if not api_key:
-            return None
+    async def test_connection(self, api_key: Optional[str] = None, model: Optional[str] = None) -> tuple[bool, str]:
+        """Uji koneksi ke Google Gemini API secara presisi dengan pesan error detail"""
+        key = api_key or self.get_api_key()
+        if not key:
+            return False, "API Key kosong. Silakan masukkan Gemini API Key Anda."
 
-        model = self.get_model()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+        target_model = model or self.get_model()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={key}"
 
         payload = {
             "contents": [
                 {
                     "parts": [
-                        {"text": prompt}
+                        {"text": "Halo Gemini, jawab singkat dalam 1 kalimat: Koneksi Gemini AI ke Alugara berhasil!"}
                     ]
                 }
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 2048,
+                "maxOutputTokens": 100,
             }
         }
 
         try:
-            async with httpx.AsyncClient(timeout=25.0) as client:
+            async with httpx.AsyncClient(timeout=20.0) as client:
                 res = await client.post(url, json=payload)
                 if res.status_code == 200:
                     data = res.json()
                     candidates = data.get("candidates", [])
                     if candidates:
                         text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        return text
+                        return True, text.strip() or "Koneksi ke Gemini AI berhasil!"
+                    return True, "Koneksi ke Gemini AI aktif dan merespons."
                 else:
-                    logger.error(f"Gemini API Error ({res.status_code}): {res.text}")
+                    err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
+                    err_msg = err_json.get("error", {}).get("message", res.text)
+                    return False, f"Google Gemini Error ({res.status_code}): {err_msg}"
         except Exception as e:
-            logger.error(f"Failed to call Gemini API: {e}")
+            return False, f"Gagal menghubungi server Gemini: {e}"
+
+    async def call_gemini(self, prompt: str, api_key: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
+        key = api_key or self.get_api_key()
+        if not key:
+            return None
+
+        target_model = model or self.get_model()
+        # Fallback list jika model utama sedang mengalami temporary high-demand (503)
+        models_to_try = [target_model]
+        for fb in ["gemini-3.7-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite"]:
+            if fb not in models_to_try:
+                models_to_try.append(fb)
+
+        for m in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": 2048,
+                }
+            }
+            try:
+                async with httpx.AsyncClient(timeout=25.0) as client:
+                    res = await client.post(url, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        candidates = data.get("candidates", [])
+                        if candidates:
+                            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    else:
+                        logger.warning(f"Gemini API ({m}) returned {res.status_code}: {res.text[:200]}")
+            except Exception as e:
+                logger.warning(f"Gemini API ({m}) exception: {e}")
 
         return None
 

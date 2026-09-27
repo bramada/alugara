@@ -154,13 +154,32 @@ async def update_gui_settings(payload: GuiSettingsPayload):
         "message": "Pengaturan Alugara & Gemini AI berhasil diamankan & disimpan ke database internal!"
     }
 
+class TestGeminiPayload(BaseModel):
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
 @router.post("/test-gemini")
-async def test_gemini_api():
+async def test_gemini_api(payload: Optional[TestGeminiPayload] = None):
     """Uji coba koneksi ke Gemini API"""
-    res = await ai_analyzer.call_gemini("Halo Gemini, jawab singkat: 'Koneksi Gemini AI ke Alugara berhasil!'")
-    if res:
-        return {"success": True, "message": res.strip()}
-    return {"success": False, "message": "Gagal terhubung ke Gemini API. Pastikan API Key valid."}
+    key_input = payload.api_key.strip() if payload and payload.api_key and payload.api_key != "****" else None
+    model_input = payload.model.strip() if payload and payload.model else None
+
+    # Jika user menginput nilai baru, simpan langsung ke database internal (terenkripsi)
+    if key_input:
+        set_setting("gemini_api_key", encrypt_value(key_input))
+        settings.GEMINI_API_KEY = key_input
+    if model_input:
+        set_setting("gemini_model", model_input)
+        settings.GEMINI_MODEL = model_input
+
+    active_key = key_input or ai_analyzer.get_api_key()
+    active_model = model_input or ai_analyzer.get_model()
+
+    if not active_key:
+        return {"success": False, "message": "Gemini API Key belum diisi. Silakan masukkan API Key terlebih dahulu."}
+
+    success, message = await ai_analyzer.test_connection(api_key=active_key, model=active_model)
+    return {"success": success, "message": message}
 
 @router.post("/trigger-login")
 async def trigger_browser_login(background_tasks: BackgroundTasks):
