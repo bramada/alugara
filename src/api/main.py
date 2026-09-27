@@ -1,4 +1,4 @@
-import os
+﻿import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse
 from loguru import logger
 from src.config.settings import settings
 from src.storage.db import init_db
-from src.api.routes import trade, session, gui
+from src.api.routes import trade, session, gui, auth
 from src.scheduler.market_scheduler import MarketScheduler
 from src.core.execution_engine import ExecutionEngine
 
@@ -25,8 +25,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Alugara - Standalone Automated Stock Trading Engine",
-    description="Engine Automasi Trading Saham Indonesia (IDX) dengan Web GUI Dashboard",
-    version="1.0.0",
+    description="Engine Automasi Trading Saham Indonesia (IDX) dengan Web GUI Dashboard & Login Security Gate",
+    version="1.1.0",
     lifespan=lifespan
 )
 
@@ -44,6 +44,7 @@ os.makedirs("src/static", exist_ok=True)
 app.mount("/screenshots", StaticFiles(directory="screenshots"), name="screenshots")
 
 # Include Routers
+app.include_router(auth.router)
 app.include_router(gui.router)
 app.include_router(trade.router)
 app.include_router(session.router)

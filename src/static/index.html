@@ -8,7 +8,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -16,11 +16,12 @@
         extend: {
           fontFamily: {
             sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
           },
           colors: {
-            darkbg: '#090d16',
-            cardbg: '#0f172a',
-            subcard: '#1e293b',
+            darkbg: '#070b14',
+            cardbg: '#0d1527',
+            subcard: '#162038',
             accent: '#3b82f6',
             accentcyan: '#06b6d4',
             bullgreen: '#10b981',
@@ -31,447 +32,635 @@
     }
   </script>
   <style>
-    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #090d16; color: #f8fafc; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #070b14; color: #f8fafc; }
     [x-cloak] { display: none !important; }
-    .glass-card { background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(51, 65, 85, 0.6); }
-    .glow-cyan { box-shadow: 0 0 25px -5px rgba(6, 182, 212, 0.25); }
-    .glow-blue { box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.25); }
-    .glow-purple { box-shadow: 0 0 25px -5px rgba(168, 85, 247, 0.25); }
+    .glass-card { background: rgba(13, 21, 39, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(51, 65, 85, 0.6); }
+    .glow-cyan { box-shadow: 0 0 35px -5px rgba(6, 182, 212, 0.25); }
+    .glow-purple { box-shadow: 0 0 35px -5px rgba(168, 85, 247, 0.25); }
+    .glow-emerald { box-shadow: 0 0 35px -5px rgba(16, 185, 129, 0.25); }
   </style>
 </head>
-<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" x-data="alugaraApp()" x-init="initDashboard()">
+<body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" x-data="alugaraApp()" x-init="initDashboard()" x-cloak>
 
-  <!-- TOP HEADER NAVBAR -->
-  <header class="sticky top-0 z-50 glass-card border-b border-slate-800/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-blue-600 to-cyan-500 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-purple-500/25">
-        🦅
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="font-extrabold text-lg sm:text-xl tracking-tight text-white">ALUGARA</h1>
-          <span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black tracking-widest uppercase flex items-center gap-1">
-            <span>✨ GEMINI AI</span>
-          </span>
-        </div>
-        <p class="text-xs text-slate-400">Autonomous Trading Engine for IDX with Persistent AI Memory</p>
-      </div>
-    </div>
+  <!-- ========================================== -->
+  <!-- 1. LOGIN & SETUP SECURITY GATE OVERLAY     -->
+  <!-- ========================================== -->
+  <div x-show="!auth.is_authenticated" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#070b14]/95 backdrop-blur-2xl">
+    
+    <!-- Background Ambient Glow Orbs -->
+    <div class="absolute -top-32 -left-32 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-cyan-600/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
 
-    <!-- Right Header: Status & Live Clock -->
-    <div class="flex items-center gap-3">
-      <!-- Session Badge -->
-      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold"
-           :class="status.session?.is_authenticated ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'">
-        <span class="w-2 h-2 rounded-full animate-pulse" :class="status.session?.is_authenticated ? 'bg-emerald-400' : 'bg-rose-400'"></span>
-        <span x-text="status.session?.is_authenticated ? 'Stockbit Terhubung' : 'Belum Login'"></span>
-      </div>
-
-      <!-- Live Clock WIB -->
-      <div class="px-3 py-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs font-mono font-bold text-cyan-300">
-        <span x-text="currentTimeWIB">--:--:-- WIB</span>
-      </div>
-
-      <!-- Refresh Button -->
-      <button @click="fetchStatus()" :disabled="loading" class="p-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all active:scale-95">
-        <svg class="w-4 h-4" :class="loading ? 'animate-spin text-cyan-400' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-        </svg>
-      </button>
-    </div>
-  </header>
-
-  <!-- MAIN CONTAINER -->
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
-
-    <!-- 1. TOP STATS OVERVIEW CARDS -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+    <div class="relative w-full max-w-md glass-card rounded-3xl p-7 sm:p-9 shadow-2xl shadow-emerald-950/40 border border-slate-700/80">
       
-      <!-- Card 1: Next Window Countdown -->
-      <div class="glass-card rounded-3xl p-4 sm:p-5 glow-cyan relative overflow-hidden">
-        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-          <span>Jadwal Bursa Berikutnya</span>
-          <span class="text-cyan-400">⏰</span>
+      <!-- Brand Header -->
+      <div class="text-center space-y-3 mb-7">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-tr from-purple-600 via-blue-600 to-cyan-500 text-white shadow-xl shadow-purple-500/30">
+          <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
         </div>
-        <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="nextActionText">15:40 WIB</p>
-        <p class="text-[11px] text-cyan-300 mt-1 font-medium" x-text="nextCountdownText">Sisa Waktu: Menghitung...</p>
-      </div>
-
-      <!-- Card 2: Modal per Strategi -->
-      <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden">
-        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-          <span>Modal per Strategi</span>
-          <span class="text-blue-400">💼</span>
-        </div>
-        <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="formatRupiah(status.settings?.capital_per_strategy || 9000000)">Rp 9.000.000</p>
-        <p class="text-[11px] text-slate-400 mt-1">Dibagi rata ke 3 emiten</p>
-      </div>
-
-      <!-- Card 3: Win Rate Realisasi -->
-      <div class="glass-card rounded-3xl p-4 sm:p-5 relative overflow-hidden">
-        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-1">
-          <span>Win Rate Bot</span>
-          <span class="text-emerald-400">🎯</span>
-        </div>
-        <p class="text-lg sm:text-2xl font-extrabold text-emerald-400 tracking-tight" x-text="(status.stats?.win_rate || 0) + '%'">0%</p>
-        <p class="text-[11px] text-slate-400 mt-1" x-text="(status.stats?.win_count || 0) + ' Win / ' + (status.stats?.loss_count || 0) + ' Loss (' + (status.stats?.total_trades || 0) + ' Trade)'">0 Win / 0 Loss</p>
-      </div>
-
-      <!-- Card 4: Gemini AI Status -->
-      <div class="glass-card rounded-3xl p-4 sm:p-5 glow-purple relative overflow-hidden flex flex-col justify-between">
-        <div class="flex items-center justify-between text-xs text-slate-400 font-semibold">
-          <span>Otak Analisis Gemini AI</span>
-          <span class="w-2.5 h-2.5 rounded-full" :class="status.settings?.gemini_api_key ? 'bg-purple-400 animate-ping' : 'bg-slate-600'"></span>
-        </div>
-        <div class="mt-2">
-          <span class="text-sm sm:text-base font-bold" :class="status.settings?.gemini_api_key ? 'text-purple-300' : 'text-slate-500'"
-                x-text="status.settings?.gemini_api_key ? 'AI Reasoning: AKTIF' : 'API Key Belum Diisi'">AI AKTIF</span>
-          <p class="text-[11px] text-slate-400 mt-0.5" x-text="status.settings?.gemini_model || 'gemini-1.5-flash'">gemini-1.5-flash</p>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 2. NAVIGATION TABS -->
-    <div class="flex items-center gap-2 border-b border-slate-800 pb-2 overflow-x-auto">
-      <button @click="activeTab = 'screener'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
-              :class="activeTab === 'screener' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
-        📡 Screener Sinyal & Skor AI
-      </button>
-      <button @click="activeTab = 'brain'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
-              :class="activeTab === 'brain' ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
-        🧠 Buku Pintar AI (<span x-text="status.ai_memories?.length || 0">0</span>)
-      </button>
-      <button @click="activeTab = 'positions'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
-              :class="activeTab === 'positions' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
-        💼 Posisi Aktif (<span x-text="status.active_positions?.length || 0">0</span>)
-      </button>
-      <button @click="activeTab = 'history'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
-              :class="activeTab === 'history' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
-        📜 Histori & Bukti Order
-      </button>
-      <button @click="activeTab = 'settings'" class="px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold transition-all shrink-0"
-              :class="activeTab === 'settings' ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-lg shadow-blue-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'">
-        ⚙️ Pengaturan & API Key
-      </button>
-    </div>
-
-    <!-- 3. TAB 1: SCREENER & AI CONFIDENCE RADAR -->
-    <div x-show="activeTab === 'screener'" class="space-y-4" x-cloak>
-      <div class="glass-card rounded-3xl p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
-          <div>
-            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <span>⚡ Rekomendasi Saham dengan AI Gatekeeper Reasoning</span>
-            </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Gemini AI menyaring fake breakout dan memilih 3 saham dengan probabilitas menang tertinggi.</p>
-          </div>
-          <button @click="triggerBuyNow()" :disabled="executing" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 active:scale-95 disabled:opacity-50">
-            <span>🚀 Eksekusi Beli Sekarang (Manual)</span>
-          </button>
-        </div>
-
-        <!-- Table Screener -->
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="text-slate-400 border-b border-slate-800/80">
-                <th class="py-3 px-3">EMITEN</th>
-                <th class="py-3 px-3">HARGA LIVE</th>
-                <th class="py-3 px-3">SKOR AI</th>
-                <th class="py-3 px-3">ALOKASI LOT</th>
-                <th class="py-3 px-3">TARGET TP</th>
-                <th class="py-3 px-3">STOP LOSS</th>
-                <th class="py-3 px-3">ANALISIS GEMINI AI</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <template x-for="sig in status.screener_signals" :key="sig.ticker">
-                <tr class="hover:bg-slate-800/30 transition-colors">
-                  <td class="py-3.5 px-3">
-                    <span class="font-extrabold text-white text-sm" x-text="sig.ticker"></span>
-                  </td>
-                  <td class="py-3.5 px-3 font-mono font-bold text-white" x-text="'Rp ' + (sig.current_price || 0).toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3">
-                    <span class="px-2.5 py-1 rounded-xl text-xs font-black"
-                          :class="(sig.ai_score || 85) >= 80 ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' : 'bg-blue-500/20 text-blue-300'"
-                          x-text="(sig.ai_score || 85) + ' / 100'"></span>
-                  </td>
-                  <td class="py-3.5 px-3">
-                    <span class="px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-mono font-bold"
-                          x-text="calculateLots(sig.current_price) + ' Lot'"></span>
-                  </td>
-                  <td class="py-3.5 px-3 font-mono text-emerald-400 font-bold" x-text="'Rp ' + (sig.target_price_1 || 0).toLocaleString('id-ID') + ' (+3%)'"></td>
-                  <td class="py-3.5 px-3 font-mono text-rose-400 font-bold" x-text="'Rp ' + (sig.stop_loss_price || 0).toLocaleString('id-ID') + ' (-2.5%)'"></td>
-                  <td class="py-3.5 px-3 text-slate-300 max-w-xs" x-text="sig.ai_reasoning || 'Akumulasi volume solid di jam penutupan bursa.'"></td>
-                </tr>
-              </template>
-              <tr x-show="!status.screener_signals || status.screener_signals.length === 0">
-                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Memuat dan menganalisis kandidat saham dengan Gemini AI...</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 4. TAB 2: AI BRAIN & KNOWLEDGE PLAYBOOK (PERSISTENT MEMORY) -->
-    <div x-show="activeTab === 'brain'" class="space-y-4" x-cloak>
-      <div class="glass-card rounded-3xl p-5 glow-purple">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
-          <div>
-            <h2 class="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-              <span>🧠 Buku Pintar AI (Persistent Memory Playbook)</span>
-            </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Memori dan aturan emas yang dipelajari AI dari setiap trade masa lalu. Pengetahuan ini tersimpan permanen di database lokal Anda.</p>
-          </div>
-          <span class="px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 text-xs font-bold border border-purple-500/30">
-            Auto-Learning: Aktif
-          </span>
-        </div>
-
-        <!-- Memories Cards Grid -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <template x-for="mem in status.ai_memories" :key="mem.id">
-            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2 relative overflow-hidden">
-              <div class="flex items-center justify-between border-b border-slate-800/80 pb-2">
-                <div class="flex items-center gap-2">
-                  <span class="font-extrabold text-white text-sm" x-text="'#' + mem.ticker"></span>
-                  <span class="text-[11px] px-2 py-0.5 rounded font-bold"
-                        :class="mem.trade_outcome === 'WIN' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'"
-                        x-text="mem.trade_outcome + ' (' + (mem.profit_percent > 0 ? '+' : '') + mem.profit_percent.toFixed(2) + '%)'"></span>
-                </div>
-                <span class="text-[10px] text-slate-500" x-text="mem.created_at"></span>
-              </div>
-              <p class="text-xs text-slate-300 leading-relaxed" x-text="mem.ai_analysis"></p>
-              <div class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-300 font-medium">
-                💡 <strong class="text-purple-200">Kaidah Emas:</strong> <span x-text="mem.lesson_learned"></span>
-              </div>
-            </div>
-          </template>
-        </div>
-
-        <div x-show="!status.ai_memories || status.ai_memories.length === 0" class="py-12 text-center text-slate-500 text-xs">
-          Belum ada memori trade yang terekam. Setiap kali posisi saham selesai dieksekusi, Gemini AI akan otomatis merumuskan kaidah emas baru di sini.
-        </div>
-      </div>
-    </div>
-
-    <!-- 5. TAB 3: ACTIVE POSITIONS -->
-    <div x-show="activeTab === 'positions'" class="space-y-4" x-cloak>
-      <div class="glass-card rounded-3xl p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-4 mb-4">
-          <div>
-            <h2 class="text-base sm:text-lg font-bold text-white">💼 Posisi Saham Aktif Alugara</h2>
-            <p class="text-xs text-slate-400 mt-0.5">Daftar saham yang sedang di-hold di database internal Alugara.</p>
-          </div>
-          <button @click="triggerSellNow()" :disabled="executing" class="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 active:scale-95 disabled:opacity-50">
-            <span>🎯 Realisasi Jual Semua (Manual)</span>
-          </button>
-        </div>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="text-slate-400 border-b border-slate-800/80">
-                <th class="py-3 px-3">EMITEN</th>
-                <th class="py-3 px-3">JUMLAH LOT</th>
-                <th class="py-3 px-3">HARGA BELI</th>
-                <th class="py-3 px-3">MODAL MASUK</th>
-                <th class="py-3 px-3">SKOR AI</th>
-                <th class="py-3 px-3">TARGET TP</th>
-                <th class="py-3 px-3">WAKTU ENTRY</th>
-                <th class="py-3 px-3">STATUS</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <template x-for="pos in status.active_positions" :key="pos.id">
-                <tr class="hover:bg-slate-800/30 transition-colors">
-                  <td class="py-3.5 px-3 font-extrabold text-white text-sm" x-text="pos.ticker"></td>
-                  <td class="py-3.5 px-3 font-mono font-bold text-cyan-300" x-text="pos.lots + ' Lot'"></td>
-                  <td class="py-3.5 px-3 font-mono" x-text="'Rp ' + pos.entry_price.toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3 font-mono font-bold text-white" x-text="'Rp ' + pos.invested_amount.toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3 font-mono text-purple-300 font-bold" x-text="pos.ai_score ? (pos.ai_score + ' / 100') : '-'"></td>
-                  <td class="py-3.5 px-3 font-mono text-emerald-400" x-text="'Rp ' + (pos.target_price_1 || 0).toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3 text-slate-400" x-text="pos.entry_date"></td>
-                  <td class="py-3.5 px-3">
-                    <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">HOLDING</span>
-                  </td>
-                </tr>
-              </template>
-              <tr x-show="!status.active_positions || status.active_positions.length === 0">
-                <td colspan="8" class="py-8 text-center text-slate-500 text-xs">Belum ada posisi saham yang sedang di-hold. Bot akan beli saat jam 15:40 WIB.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. TAB 4: TRADE HISTORY & SCREENSHOTS -->
-    <div x-show="activeTab === 'history'" class="space-y-4" x-cloak>
-      <div class="glass-card rounded-3xl p-5">
-        <h2 class="text-base sm:text-lg font-bold text-white mb-1">📜 Histori Transaksi Selesai & Bukti Order</h2>
-        <p class="text-xs text-slate-400 mb-4">Catatan seluruh transaksi yang telah dieksekusi Alugara.</p>
-
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs">
-            <thead>
-              <tr class="text-slate-400 border-b border-slate-800/80">
-                <th class="py-3 px-3">EMITEN</th>
-                <th class="py-3 px-3">HASIL</th>
-                <th class="py-3 px-3">CUAN (%)</th>
-                <th class="py-3 px-3">LABA BERSIH (Rp)</th>
-                <th class="py-3 px-3">HARGA BELI -> JUAL</th>
-                <th class="py-3 px-3">ALASAN EXIT</th>
-                <th class="py-3 px-3">TANGGAL</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800/60">
-              <template x-for="log in status.recent_trades" :key="log.id">
-                <tr class="hover:bg-slate-800/30 transition-colors">
-                  <td class="py-3.5 px-3 font-extrabold text-white" x-text="log.ticker"></td>
-                  <td class="py-3.5 px-3">
-                    <span class="px-2 py-0.5 rounded font-black text-[10px]"
-                          :class="log.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
-                          x-text="log.status"></span>
-                  </td>
-                  <td class="py-3.5 px-3 font-mono font-bold"
-                      :class="log.profit_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-                      x-text="(log.profit_percent > 0 ? '+' : '') + log.profit_percent.toFixed(2) + '%'"></td>
-                  <td class="py-3.5 px-3 font-mono font-bold"
-                      :class="log.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'"
-                      x-text="'Rp ' + log.net_profit.toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3 font-mono text-slate-300" x-text="'Rp ' + log.entry_price.toLocaleString('id-ID') + ' -> Rp ' + log.exit_price.toLocaleString('id-ID')"></td>
-                  <td class="py-3.5 px-3 text-slate-400" x-text="log.exit_reason"></td>
-                  <td class="py-3.5 px-3 text-slate-400" x-text="log.exit_date"></td>
-                </tr>
-              </template>
-              <tr x-show="!status.recent_trades || status.recent_trades.length === 0">
-                <td colspan="7" class="py-8 text-center text-slate-500 text-xs">Belum ada riwayat transaksi selesai.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- 7. TAB 5: SETTINGS & GEMINI API KEY -->
-    <div x-show="activeTab === 'settings'" class="space-y-6" x-cloak>
-      <div class="glass-card rounded-3xl p-6 max-w-3xl mx-auto space-y-6">
         <div>
-          <h2 class="text-lg font-bold text-white">⚙️ Pengaturan Alugara & Gemini AI (Simpan ke Database)</h2>
-          <p class="text-xs text-slate-400 mt-1">Konfigurasi tersimpan permanen di database internal tanpa perlu mengedit file teks <code class="text-cyan-400">.env</code>.</p>
+          <h1 class="text-2xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+            <span>ALUGARA</span>
+            <span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black tracking-widest uppercase">
+              SECURITY GATE
+            </span>
+          </h1>
+          <p class="text-xs text-slate-400 mt-1 font-medium">Autonomous Trading Engine for IDX with Gemini AI</p>
         </div>
+      </div>
 
-        <!-- Section 1: Gemini AI Key -->
-        <div class="p-4 rounded-2xl bg-gradient-to-r from-purple-900/30 via-slate-900/80 to-slate-900/80 border border-purple-500/30 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-purple-300 flex items-center gap-1.5">
-              <span>✨ Google Gemini AI API Configuration</span>
-            </h3>
-            <label class="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-              <input type="checkbox" x-model="formSettings.ai_reasoning_enabled" class="rounded bg-slate-800 border-slate-700 text-purple-500 focus:ring-0">
-              <span>Aktifkan AI Reasoning</span>
-            </label>
+      <!-- Feedback Alert -->
+      <div x-show="auth.error" x-transition class="mb-5 p-3.5 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+        <svg class="w-4 h-4 shrink-0 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span x-text="auth.error"></span>
+      </div>
+
+      <div x-show="auth.success" x-transition class="mb-5 p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
+        <svg class="w-4 h-4 shrink-0 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+        <span x-text="auth.success"></span>
+      </div>
+
+      <!-- FORM 1: SETUP FIRST TIME -->
+      <template x-if="!auth.is_configured && !auth.loading">
+        <form @submit.prevent="handleSetup()" class="space-y-4">
+          <div class="p-3.5 rounded-2xl bg-purple-950/30 border border-purple-800/40 text-purple-200 text-xs leading-relaxed">
+            <span class="font-bold text-white block mb-0.5">🔒 Setup Master Password Pertama Kali</span>
+            Buat Master Password untuk mengunci akses dashboard Alugara dan mengenkripsi API Key & Trading PIN Anda dengan aman di database lokal.
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="sm:col-span-2">
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Gemini API Key</label>
-              <input type="password" x-model="formSettings.gemini_api_key" placeholder="Masukkan Gemini API Key (AIzaSy...)"
-                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400 font-mono">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI</label>
-              <select x-model="formSettings.gemini_model" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400">
-                <option value="gemini-3.1-pro">Gemini 3.1 Pro (Rekomendasi Utama - Deep Reasoning)</option>
-                <option value="gemini-3.7-flash">Gemini 3.7 Flash High (Thinking & Fast)</option>
-                <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra-Fast)</option>
-                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-              </select>
-            </div>
-          </div>
-
-          <button @click="testGemini()" class="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold transition-all">
-            ✨ Uji Coba Koneksi Gemini AI
-          </button>
-        </div>
-
-        <!-- Section 2: Stockbit PIN & Login -->
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-          <h3 class="text-sm font-bold text-cyan-400">2. Akun & Keamanan Stockbit</h3>
-          
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">PIN Trading Stockbit (6 Digit)</label>
-              <input type="password" x-model="formSettings.trading_pin" placeholder="Masukkan 6 Digit PIN"
-                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400">
-            </div>
-
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pairing Login Sesi</label>
-              <button @click="triggerBrowserLogin()" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2">
-                <span>🔑 Hubungkan / Login Stockbit</span>
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Master Password / PIN Baru</label>
+            <div class="relative">
+              <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.setup_password" required
+                     placeholder="Minimal 4 karakter atau 6 digit PIN"
+                     class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 pr-10">
+              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white">
+                <span x-text="auth.show_password ? '🙈' : '👁️'"></span>
               </button>
             </div>
           </div>
-        </div>
 
-        <!-- Section 3: Modal & Risk -->
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-          <h3 class="text-sm font-bold text-cyan-400">3. Manajemen Modal</h3>
-          
           <div>
-            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Total Modal yang Dialokasikan (Rp)</label>
-            <input type="number" x-model.number="formSettings.capital_per_strategy" placeholder="9000000"
-                   class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
-            <p class="text-[11px] text-slate-400 mt-1">Modal ini otomatis dibagi rata ke 3 saham terbaik hasil screening Gemini AI.</p>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Konfirmasi Master Password</label>
+            <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.setup_confirm_password" required
+                   placeholder="Ketik ulang password"
+                   class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400">
           </div>
-        </div>
 
-        <!-- Section 4: Telegram Bot -->
-        <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-          <div class="flex items-center justify-between">
-            <h3 class="text-sm font-bold text-cyan-400">4. Notifikasi Bot Telegram</h3>
-            <label class="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
-              <input type="checkbox" x-model="formSettings.telegram_enabled" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
-              <span>Aktifkan Telegram</span>
+          <button type="submit" :disabled="auth.submitting"
+                  class="w-full mt-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-purple-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            <span x-show="!auth.submitting">🚀 Buat Password & Buka Dashboard</span>
+            <span x-show="auth.submitting">Menyimpan...</span>
+          </button>
+        </form>
+      </template>
+
+      <!-- FORM 2: LOGIN RETURNING USER -->
+      <template x-if="auth.is_configured && !auth.loading">
+        <form @submit.prevent="handleLogin()" class="space-y-4">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="block text-xs font-semibold text-slate-300">Master Password / App PIN</label>
+              <span class="text-[11px] text-cyan-400 font-medium">Terenkripsi AES-256</span>
+            </div>
+            <div class="relative">
+              <input :type="auth.show_password ? 'text' : 'password'" x-model="auth.login_password" required autofocus
+                     placeholder="Masukkan Master Password Anda"
+                     class="w-full px-4 py-3 rounded-2xl bg-slate-900 border border-slate-700/80 text-white text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 pr-10">
+              <button type="button" @click="auth.show_password = !auth.show_password" class="absolute right-3.5 top-3.5 text-slate-400 hover:text-white">
+                <span x-text="auth.show_password ? '🙈' : '👁️'"></span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <label class="flex items-center gap-2 text-xs font-medium text-slate-300 cursor-pointer select-none">
+              <input type="checkbox" x-model="auth.remember_me" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+              <span>Ingat sesi di komputer ini (30 Hari)</span>
             </label>
           </div>
 
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Bot Token</label>
-              <input type="text" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
-                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Chat ID</label>
-              <input type="text" x-model="formSettings.telegram_chat_id" placeholder="987654321"
-                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
-            </div>
-          </div>
-
-          <button @click="testTelegram()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 text-xs font-bold transition-all">
-            💬 Uji Coba Kirim Pesan Telegram
+          <button type="submit" :disabled="auth.submitting"
+                  class="w-full mt-2 py-3.5 px-5 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 hover:opacity-95 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+            <span x-show="!auth.submitting">🔓 Buka Dashboard Alugara</span>
+            <span x-show="auth.submitting">Memverifikasi...</span>
           </button>
+        </form>
+      </template>
+
+      <!-- Loading State -->
+      <div x-show="auth.loading" class="py-8 text-center text-slate-400 text-xs">
+        <svg class="animate-spin h-7 w-7 text-cyan-400 mx-auto mb-3" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>Memeriksa status keamanan...</span>
+      </div>
+
+      <div class="mt-6 pt-5 border-t border-slate-800/80 text-center">
+        <p class="text-[11px] text-slate-500">
+          Kredensial disimpan lokal secara terenkripsi di <code class="text-cyan-400">data/alugara.db</code>
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- 2. MAIN DASHBOARD CONTENT (PROTECTED)     -->
+  <!-- ========================================== -->
+  <div x-show="auth.is_authenticated" class="flex-1 flex flex-col">
+
+    <!-- TOP HEADER NAVBAR -->
+    <header class="sticky top-0 z-40 glass-card border-b border-slate-800/80 px-4 sm:px-8 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-purple-600 via-blue-600 to-cyan-500 flex items-center justify-center text-white text-xl font-black shadow-lg shadow-purple-500/25">
+          ⚡
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-extrabold text-lg sm:text-xl tracking-tight text-white">ALUGARA</h1>
+            <span class="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 text-[10px] font-black tracking-widest uppercase flex items-center gap-1">
+              <span>🧠 GEMINI AI</span>
+            </span>
+          </div>
+          <p class="text-xs text-slate-400 hidden sm:block">Autonomous Trading Engine for IDX with Persistent AI Memory</p>
+        </div>
+      </div>
+
+      <!-- Right Header: Status, Live Clock, Logout -->
+      <div class="flex items-center gap-3">
+        <!-- Stockbit Session Badge -->
+        <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold"
+             :class="status.session?.is_authenticated ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-rose-500/10 border-rose-500/30 text-rose-400'">
+          <span class="w-2 h-2 rounded-full animate-pulse" :class="status.session?.is_authenticated ? 'bg-emerald-400' : 'bg-rose-400'"></span>
+          <span x-text="status.session?.is_authenticated ? 'Stockbit Terhubung' : 'Belum Login'"></span>
         </div>
 
-        <!-- Submit Button -->
-        <div class="flex justify-end pt-2">
-          <button @click="saveSettings()" :disabled="saving" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 hover:opacity-90 text-white font-bold text-sm shadow-xl shadow-purple-500/25 active:scale-95 transition-all disabled:opacity-50">
-            <span x-text="saving ? 'Menyimpan...' : '💾 Simpan Semua Pengaturan'"></span>
-          </button>
+        <!-- Live Clock WIB -->
+        <div class="px-3 py-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 text-xs font-mono font-bold text-cyan-300">
+          <span x-text="currentTimeWIB">--:--:-- WIB</span>
+        </div>
+
+        <!-- Refresh Button -->
+        <button @click="fetchStatus()" :disabled="loading" title="Refresh Status"
+                class="p-2 rounded-2xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white transition-all active:scale-95">
+          <svg class="w-4 h-4" :class="loading ? 'animate-spin' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        </button>
+
+        <!-- Lock / Logout Button -->
+        <button @click="handleLogout()" title="Kunci Dashboard"
+                class="flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold transition-all active:scale-95">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+          <span class="hidden sm:inline">Kunci</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN BODY -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 space-y-6">
+
+      <!-- TOP METRIC CARDS ROW -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        
+        <!-- Card 1: Next Action Countdown -->
+        <div class="glass-card rounded-3xl p-5 glow-cyan relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>JADWAL BERIKUTNYA</span>
+            <span class="px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 text-[10px]">AUTO BSJP</span>
+          </div>
+          <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="nextActionText">15:40 WIB (Beli Sore)</p>
+          <p class="text-xs font-mono text-cyan-400 mt-1" x-text="nextCountdownText">Menghitung waktu...</p>
+        </div>
+
+        <!-- Card 2: Modal Kerja -->
+        <div class="glass-card rounded-3xl p-5 relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>MODAL ALOKASI STRATEGI</span>
+            <span class="text-[10px] text-slate-500 font-mono">Max 3 Saham</span>
+          </div>
+          <p class="text-lg sm:text-2xl font-extrabold text-white tracking-tight" x-text="formatRupiah(status.settings?.capital_per_strategy || 9000000)">Rp 9.000.000</p>
+          <p class="text-[11px] text-slate-400 mt-1">Rp 3.000.000 / ticker (Diversifikasi)</p>
+        </div>
+
+        <!-- Card 3: Win Rate & Profit -->
+        <div class="glass-card rounded-3xl p-5 glow-emerald relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>PERFORMA STRATEGI</span>
+            <span class="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[10px]">WIN RATE</span>
+          </div>
+          <p class="text-lg sm:text-2xl font-extrabold text-emerald-400 tracking-tight" x-text="(status.stats?.win_rate || 0) + '%'">0%</p>
+          <p class="text-[11px] text-slate-400 mt-1" x-text="(status.stats?.win_count || 0) + ' Win / ' + (status.stats?.loss_count || 0) + ' Loss (' + (status.stats?.total_trades || 0) + ' Trade)'">0 Win / 0 Loss</p>
+        </div>
+
+        <!-- Card 4: Gemini AI Status -->
+        <div class="glass-card rounded-3xl p-5 glow-purple relative overflow-hidden">
+          <div class="flex items-center justify-between text-xs text-slate-400 font-semibold mb-2">
+            <span>OTAK AI TRADING</span>
+            <span class="w-2.5 h-2.5 rounded-full" :class="status.settings?.gemini_api_key ? 'bg-purple-400 animate-ping' : 'bg-slate-600'"></span>
+          </div>
+          <div class="flex items-baseline gap-2">
+            <span class="text-sm sm:text-base font-bold" :class="status.settings?.gemini_api_key ? 'text-purple-300' : 'text-slate-500'"
+                  x-text="status.settings?.gemini_api_key ? 'AI Reasoning: AKTIF' : 'API Key Belum Diisi'">AI AKTIF</span>
+          </div>
+          <p class="text-[11px] text-slate-400 mt-0.5 font-mono" x-text="status.settings?.gemini_model || 'gemini-3.1-pro'">gemini-3.1-pro</p>
         </div>
 
       </div>
-    </div>
 
-  </main>
+      <!-- TABS NAVIGATION BAR -->
+      <div class="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto text-sm">
+        <button @click="activeTab = 'screener'"
+                :class="activeTab === 'screener' ? 'bg-cyan-500/15 border-cyan-500/40 text-cyan-300' : 'text-slate-400 hover:text-slate-200 border-transparent'"
+                class="px-4 py-2.5 rounded-2xl border font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>📡 Sinyal BSJP Hari Ini</span>
+        </button>
+        <button @click="activeTab = 'memories'"
+                :class="activeTab === 'memories' ? 'bg-purple-500/15 border-purple-500/40 text-purple-300' : 'text-slate-400 hover:text-slate-200 border-transparent'"
+                class="px-4 py-2.5 rounded-2xl border font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>🧠 Buku Pintar AI (<span x-text="status.ai_memories?.length || 0">0</span>)</span>
+        </button>
+        <button @click="activeTab = 'positions'"
+                :class="activeTab === 'positions' ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300' : 'text-slate-400 hover:text-slate-200 border-transparent'"
+                class="px-4 py-2.5 rounded-2xl border font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>💼 Posisi Aktif (<span x-text="status.active_positions?.length || 0">0</span>)</span>
+        </button>
+        <button @click="activeTab = 'history'"
+                :class="activeTab === 'history' ? 'bg-blue-500/15 border-blue-500/40 text-blue-300' : 'text-slate-400 hover:text-slate-200 border-transparent'"
+                class="px-4 py-2.5 rounded-2xl border font-bold transition-all flex items-center gap-2 whitespace-nowrap">
+          <span>📜 Riwayat Transaksi</span>
+        </button>
+        <button @click="activeTab = 'settings'"
+                :class="activeTab === 'settings' ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'text-slate-400 hover:text-slate-200 border-transparent'"
+                class="px-4 py-2.5 rounded-2xl border font-bold transition-all flex items-center gap-2 whitespace-nowrap ml-auto">
+          <span>⚙️ Pengaturan & Keamanan</span>
+        </button>
+      </div>
+
+      <!-- TAB 1: SCREENER SIGNALS -->
+      <div x-show="activeTab === 'screener'" class="space-y-4">
+        <div class="glass-card rounded-3xl p-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                <span>📡 Hasil Screening Real-Time & AI Scoring</span>
+              </h2>
+              <p class="text-xs text-slate-400 mt-1">Saham berpotensi lonjakan untuk Beli Sore (15:40 WIB) dan Jual Pagi (09:10 WIB).</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="triggerBuyNow()" :disabled="executing"
+                      class="px-4 py-2 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/25 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50">
+                <span>⚡ Eksekusi Beli Sore Sekarang</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-3">TICKER</th>
+                  <th class="py-3 px-3">STRATEGI</th>
+                  <th class="py-3 px-3">HARGA SAAT INI</th>
+                  <th class="py-3 px-3">TARGET TP1 (+3%)</th>
+                  <th class="py-3 px-3">TARGET TP2 (+5%)</th>
+                  <th class="py-3 px-3">STOP LOSS (-2.5%)</th>
+                  <th class="py-3 px-3">ESTIMASI LOT</th>
+                  <th class="py-3 px-3">AI SCORE</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono">
+                <template x-for="sig in status.screener_signals" :key="sig.ticker">
+                  <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="py-3 px-3 font-bold text-cyan-400 text-sm" x-text="sig.ticker"></td>
+                    <td class="py-3 px-3 text-slate-300 font-sans" x-text="sig.strategy_name"></td>
+                    <td class="py-3 px-3 text-white font-bold" x-text="'Rp ' + sig.current_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-emerald-400" x-text="'Rp ' + sig.target_price_1.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-emerald-300" x-text="'Rp ' + sig.target_price_2.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-rose-400" x-text="'Rp ' + sig.stop_loss_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-purple-300 font-bold" x-text="calculateLots(sig.current_price) + ' Lot'"></td>
+                    <td class="py-3 px-3">
+                      <span class="px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[11px] border border-purple-500/30">
+                        88/100
+                      </span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!status.screener_signals || status.screener_signals.length === 0">
+                  <td colspan="8" class="py-8 text-center text-slate-500 font-sans">
+                    Sedang memindai sinyal pasar...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: AI PLAYBOOK / MEMORIES -->
+      <div x-show="activeTab === 'memories'" class="space-y-4">
+        <div class="glass-card rounded-3xl p-6">
+          <div class="mb-4">
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <span>🧠 Buku Pintar AI (Persistent Market Knowledge)</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-1">
+              Setiap hasil trading dianalisis oleh Gemini AI dan disimpan secara permanen di database internal sebagai memori strategi masa depan.
+            </p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <template x-for="mem in status.ai_memories" :key="mem.id">
+              <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2.5">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2 font-mono">
+                    <span class="text-base font-extrabold text-cyan-400" x-text="mem.ticker"></span>
+                    <span class="text-xs text-slate-400" x-text="mem.strategy_name"></span>
+                  </div>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                        :class="mem.trade_outcome === 'WIN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
+                        x-text="mem.trade_outcome + ' (' + mem.profit_percent + '%)'"></span>
+                </div>
+                <div class="text-xs text-slate-300 leading-relaxed font-sans">
+                  <p class="text-slate-400 text-[11px] font-semibold uppercase tracking-wider mb-1">Analisis Gemini AI:</p>
+                  <p x-text="mem.ai_analysis"></p>
+                </div>
+                <div class="pt-2 border-t border-slate-800 text-xs text-purple-300 font-sans flex items-start gap-1.5">
+                  <span class="font-bold shrink-0">💡 Pelajaran:</span>
+                  <span x-text="mem.lesson_learned"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div x-show="!status.ai_memories || status.ai_memories.length === 0" class="py-12 text-center text-slate-500 text-xs">
+            Belum ada memori trading yang tersimpan. AI akan mengevaluasi otomatis setelah transaksi pertama selesai.
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3: POSISI AKTIF -->
+      <div x-show="activeTab === 'positions'" class="space-y-4">
+        <div class="glass-card rounded-3xl p-6">
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+            <div>
+              <h2 class="text-lg font-bold text-white">💼 Saham yang Sedang Aktif di-Hold</h2>
+              <p class="text-xs text-slate-400 mt-1">Saham yang dibeli kemarin sore dan dijadwalkan dijual pagi ini.</p>
+            </div>
+            <button @click="triggerSellNow()" :disabled="executing"
+                    class="px-4 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-50">
+              <span>🚀 Eksekusi Jual Pagi Sekarang</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-3">TICKER</th>
+                  <th class="py-3 px-3">ENTRY</th>
+                  <th class="py-3 px-3">HARGA SAAT INI</th>
+                  <th class="py-3 px-3">LOT</th>
+                  <th class="py-3 px-3">MODAL</th>
+                  <th class="py-3 px-3">TP 1</th>
+                  <th class="py-3 px-3">TP 2</th>
+                  <th class="py-3 px-3">STOP LOSS</th>
+                  <th class="py-3 px-3">STATUS</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono">
+                <template x-for="pos in status.active_positions" :key="pos.id">
+                  <tr class="hover:bg-slate-800/30">
+                    <td class="py-3 px-3 font-bold text-cyan-400 text-sm" x-text="pos.ticker"></td>
+                    <td class="py-3 px-3" x-text="'Rp ' + pos.entry_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 font-bold text-white" x-text="'Rp ' + pos.current_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-purple-300" x-text="pos.lots + ' Lot'"></td>
+                    <td class="py-3 px-3" x-text="formatRupiah(pos.invested_amount)"></td>
+                    <td class="py-3 px-3 text-emerald-400" x-text="'Rp ' + (pos.target_price_1 || 0).toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-emerald-300" x-text="'Rp ' + (pos.target_price_2 || 0).toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-rose-400" x-text="'Rp ' + (pos.stop_loss_price || 0).toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 font-sans">
+                      <span class="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-bold text-[10px]">ACTIVE HOLD</span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!status.active_positions || status.active_positions.length === 0">
+                  <td colspan="9" class="py-8 text-center text-slate-500 font-sans">
+                    Tidak ada posisi aktif saat ini.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: RIWAYAT TRANSAKSI -->
+      <div x-show="activeTab === 'history'" class="space-y-4">
+        <div class="glass-card rounded-3xl p-6">
+          <div class="mb-4">
+            <h2 class="text-lg font-bold text-white">📜 Catatan Riwayat Transaksi Selesai</h2>
+            <p class="text-xs text-slate-400 mt-1">Audit log seluruh transaksi eksekusi bot Alugara beserta evaluasi laba/rugi.</p>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-3">TICKER</th>
+                  <th class="py-3 px-3">TGL ENTRY</th>
+                  <th class="py-3 px-3">TGL EXIT</th>
+                  <th class="py-3 px-3">ENTRY</th>
+                  <th class="py-3 px-3">EXIT</th>
+                  <th class="py-3 px-3">LOT</th>
+                  <th class="py-3 px-3">NET PROFIT</th>
+                  <th class="py-3 px-3">PROFIT %</th>
+                  <th class="py-3 px-3">OUTCOME</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/60 font-mono">
+                <template x-for="log in status.recent_trades" :key="log.id">
+                  <tr class="hover:bg-slate-800/30">
+                    <td class="py-3 px-3 font-bold text-cyan-400" x-text="log.ticker"></td>
+                    <td class="py-3 px-3 text-slate-400 text-[11px]" x-text="log.entry_date"></td>
+                    <td class="py-3 px-3 text-slate-400 text-[11px]" x-text="log.exit_date"></td>
+                    <td class="py-3 px-3" x-text="'Rp ' + log.entry_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 font-bold text-white" x-text="'Rp ' + log.exit_price.toLocaleString('id-ID')"></td>
+                    <td class="py-3 px-3 text-purple-300" x-text="log.lots + ' Lot'"></td>
+                    <td class="py-3 px-3 font-bold" :class="log.net_profit >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                        x-text="formatRupiah(log.net_profit)"></td>
+                    <td class="py-3 px-3 font-bold" :class="log.profit_percent >= 0 ? 'text-emerald-400' : 'text-rose-400'"
+                        x-text="log.profit_percent + '%'"></td>
+                    <td class="py-3 px-3 font-sans">
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                            :class="log.status === 'WIN' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'"
+                            x-text="log.status"></span>
+                    </td>
+                  </tr>
+                </template>
+                <tr x-show="!status.recent_trades || status.recent_trades.length === 0">
+                  <td colspan="9" class="py-8 text-center text-slate-500 font-sans">
+                    Belum ada riwayat transaksi yang tersimpan.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: PENGATURAN & KEAMANAN -->
+      <div x-show="activeTab === 'settings'" class="space-y-6">
+        <div class="glass-card rounded-3xl p-6 max-w-3xl mx-auto space-y-6">
+          <div>
+            <h2 class="text-lg font-bold text-white">⚙️ Pengaturan Alugara, Keamanan & AI</h2>
+            <p class="text-xs text-slate-400 mt-1">Seluruh kredensial sensitif dienkripsi dengan standar AES-256 dan disimpan di database lokal SQLite.</p>
+          </div>
+
+          <!-- Section 1: Gemini AI Key -->
+          <div class="p-4 rounded-2xl bg-gradient-to-r from-purple-900/30 via-slate-900/80 to-slate-900/80 border border-purple-500/30 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-purple-300 flex items-center gap-1.5">
+                <span>🧠 Google Gemini AI API Configuration</span>
+              </h3>
+              <label class="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="formSettings.ai_reasoning_enabled" class="rounded bg-slate-800 border-slate-700 text-purple-500 focus:ring-0">
+                <span>Aktifkan AI Reasoning</span>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Gemini API Key</label>
+                <input type="password" x-model="formSettings.gemini_api_key" placeholder="Masukkan Gemini API Key (AIzaSy...)"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400 font-mono">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI</label>
+                <select x-model="formSettings.gemini_model" class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400">
+                  <option value="gemini-3.1-pro">Gemini 3.1 Pro (Rekomendasi Utama - Deep Reasoning)</option>
+                  <option value="gemini-3.7-flash">Gemini 3.7 Flash High (Thinking & Fast)</option>
+                  <option value="gemini-3.8-flash">Gemini 3.8 Flash (Ultra-Fast)</option>
+                  <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                  <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                  <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                </select>
+              </div>
+            </div>
+
+            <button @click="testGemini()" class="px-4 py-2 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold transition-all">
+              🧠 Uji Coba Koneksi Gemini AI
+            </button>
+          </div>
+
+          <!-- Section 2: Stockbit PIN & Login -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <h3 class="text-sm font-bold text-cyan-400">2. Akun & Keamanan Stockbit</h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">PIN Trading Stockbit (6 Digit)</label>
+                <input type="password" x-model="formSettings.trading_pin" placeholder="Masukkan 6 Digit PIN (Terenkripsi AES)"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pairing Login Sesi</label>
+                <button @click="triggerBrowserLogin()" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2">
+                  <span>🔑 Hubungkan / Login Stockbit</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Modal & Risk -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <h3 class="text-sm font-bold text-cyan-400">3. Manajemen Modal</h3>
+            
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Total Modal yang Dialokasikan (Rp)</label>
+              <input type="number" x-model.number="formSettings.capital_per_strategy" placeholder="9000000"
+                     class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+              <p class="text-[11px] text-slate-400 mt-1">Modal ini otomatis dibagi rata ke 3 saham terbaik hasil screening Gemini AI.</p>
+            </div>
+          </div>
+
+          <!-- Section 4: Telegram Bot -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-cyan-400">4. Notifikasi Bot Telegram</h3>
+              <label class="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="formSettings.telegram_enabled" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+                <span>Aktifkan Telegram</span>
+              </label>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Bot Token</label>
+                <input type="text" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Chat ID</label>
+                <input type="text" x-model="formSettings.telegram_chat_id" placeholder="987654321"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
+              </div>
+            </div>
+
+            <button @click="testTelegram()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-cyan-300 text-xs font-bold transition-all">
+              📩 Uji Coba Kirim Pesan Telegram
+            </button>
+          </div>
+
+          <!-- Section 5: Master Password Change -->
+          <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
+            <h3 class="text-sm font-bold text-cyan-400">5. Keamanan Master Password Aplikasi</h3>
+            <p class="text-xs text-slate-400">Ganti Master Password / App PIN yang digunakan untuk membuka Dashboard Alugara.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <input type="password" x-model="changePwd.current" placeholder="Password Saat Ini"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+              </div>
+              <div>
+                <input type="password" x-model="changePwd.new_pwd" placeholder="Password Baru"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+              </div>
+              <div>
+                <input type="password" x-model="changePwd.confirm_pwd" placeholder="Ulangi Password Baru"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+              </div>
+            </div>
+            <button @click="handleChangePassword()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition-all">
+              🔐 Perbarui Master Password
+            </button>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="flex justify-end pt-2">
+            <button @click="saveSettings()" :disabled="saving" class="px-6 py-3 rounded-2xl bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 hover:opacity-90 text-white font-bold text-sm shadow-xl shadow-purple-500/25 active:scale-95 transition-all disabled:opacity-50">
+              <span x-text="saving ? 'Menyimpan...' : '💾 Simpan Semua Pengaturan'"></span>
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
 
   <!-- ALPINE JS LOGIC -->
   <script>
@@ -484,6 +673,28 @@
         currentTimeWIB: '',
         nextActionText: '15:40 WIB (Beli Sore)',
         nextCountdownText: 'Menghitung waktu...',
+        
+        // Security Gate & Auth State
+        auth: {
+          is_configured: false,
+          is_authenticated: false,
+          loading: true,
+          submitting: false,
+          error: '',
+          success: '',
+          show_password: false,
+          remember_me: true,
+          login_password: '',
+          setup_password: '',
+          setup_confirm_password: '',
+        },
+
+        changePwd: {
+          current: '',
+          new_pwd: '',
+          confirm_pwd: ''
+        },
+
         status: {
           session: {},
           stats: {},
@@ -493,10 +704,11 @@
           screener_signals: [],
           settings: {}
         },
+
         formSettings: {
           trading_pin: '',
           gemini_api_key: '',
-          gemini_model: 'gemini-1.5-flash',
+          gemini_model: 'gemini-3.1-pro',
           ai_reasoning_enabled: true,
           capital_per_strategy: 9000000,
           telegram_enabled: false,
@@ -504,10 +716,135 @@
           telegram_chat_id: '',
         },
 
-        initDashboard() {
+        async initDashboard() {
           this.startClock();
-          this.fetchStatus();
-          setInterval(() => this.fetchStatus(), 15000);
+          await this.checkAuthStatus();
+          if (this.auth.is_authenticated) {
+            await this.fetchStatus();
+            setInterval(() => {
+              if (this.auth.is_authenticated) {
+                this.fetchStatus();
+              }
+            }, 15000);
+          }
+        },
+
+        async checkAuthStatus() {
+          try {
+            this.auth.loading = true;
+            const res = await fetch('/api/v1/auth/status');
+            const data = await res.json();
+            this.auth.is_configured = data.is_configured;
+            this.auth.is_authenticated = data.is_authenticated;
+          } catch (e) {
+            console.error('Auth status check error:', e);
+            this.auth.error = 'Gagal memeriksa status autentikasi.';
+          } finally {
+            this.auth.loading = false;
+          }
+        },
+
+        async handleSetup() {
+          this.auth.error = '';
+          this.auth.success = '';
+          if (this.auth.setup_password !== this.auth.setup_confirm_password) {
+            this.auth.error = 'Konfirmasi password tidak cocok!';
+            return;
+          }
+          if (this.auth.setup_password.length < 4) {
+            this.auth.error = 'Password minimal 4 karakter!';
+            return;
+          }
+
+          try {
+            this.auth.submitting = true;
+            const res = await fetch('/api/v1/auth/setup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                password: this.auth.setup_password,
+                confirm_password: this.auth.setup_confirm_password
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Gagal melakukan setup');
+
+            this.auth.is_configured = true;
+            this.auth.is_authenticated = true;
+            this.auth.success = 'Setup berhasil! Membuka dashboard...';
+            await this.fetchStatus();
+          } catch (err) {
+            this.auth.error = err.message;
+          } finally {
+            this.auth.submitting = false;
+          }
+        },
+
+        async handleLogin() {
+          this.auth.error = '';
+          this.auth.success = '';
+          try {
+            this.auth.submitting = true;
+            const res = await fetch('/api/v1/auth/login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                password: this.auth.login_password,
+                remember: this.auth.remember_me
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Login gagal');
+
+            this.auth.is_authenticated = true;
+            this.auth.login_password = '';
+            await this.fetchStatus();
+          } catch (err) {
+            this.auth.error = err.message;
+          } finally {
+            this.auth.submitting = false;
+          }
+        },
+
+        async handleLogout() {
+          if (!confirm('Kunci Dashboard Alugara sekarang?')) return;
+          try {
+            await fetch('/api/v1/auth/logout', { method: 'POST' });
+          } catch (e) {
+            console.error(e);
+          }
+          this.auth.is_authenticated = false;
+          this.auth.login_password = '';
+        },
+
+        async handleChangePassword() {
+          if (!this.changePwd.current || !this.changePwd.new_pwd) {
+            alert('Harap isi semua kolom password');
+            return;
+          }
+          if (this.changePwd.new_pwd !== this.changePwd.confirm_pwd) {
+            alert('Konfirmasi password baru tidak cocok');
+            return;
+          }
+          try {
+            const res = await fetch('/api/v1/auth/change-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                current_password: this.changePwd.current,
+                new_password: this.changePwd.new_pwd,
+                confirm_new_password: this.changePwd.confirm_pwd
+              })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.detail || 'Gagal mengubah password');
+            alert(data.message || 'Master Password berhasil diubah!');
+            this.changePwd.current = '';
+            this.changePwd.new_pwd = '';
+            this.changePwd.confirm_pwd = '';
+          } catch (e) {
+            alert(e.message);
+          }
         },
 
         startClock() {
@@ -550,11 +887,15 @@
           try {
             this.loading = true;
             const res = await fetch('/api/v1/gui/status');
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             if (data.success) {
               this.status = data;
               this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
-              this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-1.5-flash';
+              this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-3.1-pro';
               this.formSettings.ai_reasoning_enabled = data.settings.ai_reasoning_enabled ?? true;
               this.formSettings.telegram_enabled = data.settings.telegram_enabled || false;
               this.formSettings.telegram_bot_token = data.settings.telegram_bot_token || '';
@@ -586,6 +927,10 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify(this.formSettings)
             });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message || 'Pengaturan berhasil disimpan!');
             await this.fetchStatus();
@@ -599,6 +944,10 @@
         async testGemini() {
           try {
             const res = await fetch('/api/v1/gui/test-gemini', { method: 'POST' });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message);
           } catch (e) {
@@ -611,6 +960,10 @@
           if (!conf) return;
           try {
             const res = await fetch('/api/v1/gui/trigger-login', { method: 'POST' });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message || 'Browser sedang dibuka!');
           } catch (e) {
@@ -624,6 +977,10 @@
           try {
             this.executing = true;
             const res = await fetch('/api/v1/gui/trigger-buy', { method: 'POST' });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message);
             await this.fetchStatus();
@@ -640,6 +997,10 @@
           try {
             this.executing = true;
             const res = await fetch('/api/v1/gui/trigger-sell', { method: 'POST' });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message);
             await this.fetchStatus();
@@ -653,6 +1014,10 @@
         async testTelegram() {
           try {
             const res = await fetch('/api/v1/gui/test-telegram', { method: 'POST' });
+            if (res.status === 401) {
+              this.auth.is_authenticated = false;
+              return;
+            }
             const data = await res.json();
             alert(data.message);
           } catch (e) {

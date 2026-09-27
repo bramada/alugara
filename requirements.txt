@@ -11,3 +11,4 @@ python-multipart>=0.0.9
 pytz>=2024.1
 aiofiles>=23.2.1
 click>=8.1.7
+cryptography>=42.0.0

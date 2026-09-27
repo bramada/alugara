@@ -1,10 +1,11 @@
-from fastapi import APIRouter
+﻿from fastapi import APIRouter, Depends
 from typing import List, Dict, Any
 from src.core.models import OrderRequest, OrderResult
 from src.core.execution_engine import ExecutionEngine
 from src.storage.db import get_active_positions, get_trade_logs
+from src.core.security import require_auth
 
-router = APIRouter(prefix="/api/v1/trade", tags=["Trading Execution"])
+router = APIRouter(prefix="/api/v1/trade", tags=["Trading Execution"], dependencies=[Depends(require_auth)])
 engine = ExecutionEngine()
 
 @router.post("/execute-order", response_model=OrderResult)

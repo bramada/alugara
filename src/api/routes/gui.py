@@ -1,8 +1,8 @@
-import os
+﻿import os
 import asyncio
 from datetime import datetime
 from typing import Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from src.config.settings import settings
 from src.storage.db import (
@@ -16,8 +16,9 @@ from src.drivers.stockbit_driver import StockbitDriver
 from src.core.execution_engine import ExecutionEngine
 from src.notifier.telegram_notifier import TelegramNotifier
 from src.ai.gemini_analyzer import GeminiAnalyzer
+from src.core.security import require_auth, encrypt_value, decrypt_value
 
-router = APIRouter(prefix="/api/v1/gui", tags=["Web GUI Dashboard"])
+router = APIRouter(prefix="/api/v1/gui", tags=["Web GUI Dashboard"], dependencies=[Depends(require_auth)])
 engine = ExecutionEngine()
 notifier = TelegramNotifier()
 ai_analyzer = GeminiAnalyzer()
@@ -36,7 +37,7 @@ class GuiSettingsPayload(BaseModel):
 @router.get("/status")
 async def get_gui_dashboard_status():
     """
-    Mengambil data status lengkap untuk Web Dashboard Alugara
+    Mengambil data status lengkap untuk Web Dashboard Alugara (Terproteksi Login Gate)
     """
     valid, session_msg = await engine.driver.check_session_valid()
     positions = get_active_positions()
@@ -54,6 +55,11 @@ async def get_gui_dashboard_status():
     raw_signals = await engine.screener.scan_market_signals()
     # Jika AI aktif, saring dan beri skor
     signals = await ai_analyzer.analyze_and_rank_candidates(raw_signals)
+
+    # Cek ketersediaan secret terenkripsi
+    stored_pin = decrypt_value(db_settings.get("trading_pin", "")) or settings.STOCKBIT_TRADING_PIN
+    stored_gemini = decrypt_value(db_settings.get("gemini_api_key", "")) or settings.GEMINI_API_KEY
+    stored_tele_token = decrypt_value(db_settings.get("telegram_bot_token", "")) or settings.TELEGRAM_BOT_TOKEN
 
     return {
         "success": True,
@@ -74,14 +80,14 @@ async def get_gui_dashboard_status():
         "ai_memories": ai_memories,
         "screener_signals": signals,
         "settings": {
-            "trading_pin": "****" if db_settings.get("trading_pin") or settings.STOCKBIT_TRADING_PIN else "",
-            "gemini_api_key": "****" if db_settings.get("gemini_api_key") or settings.GEMINI_API_KEY else "",
+            "trading_pin": "****" if stored_pin else "",
+            "gemini_api_key": "****" if stored_gemini else "",
             "gemini_model": db_settings.get("gemini_model", settings.GEMINI_MODEL),
             "ai_reasoning_enabled": db_settings.get("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED)).lower() == "true",
             "capital_per_strategy": float(db_settings.get("capital_per_strategy", settings.CAPITAL_PER_STRATEGY)),
             "auto_execute_enabled": db_settings.get("auto_execute_enabled", str(settings.AUTO_EXECUTE_ENABLED)).lower() == "true",
             "telegram_enabled": db_settings.get("telegram_enabled", str(settings.TELEGRAM_ENABLED)).lower() == "true",
-            "telegram_bot_token": db_settings.get("telegram_bot_token", settings.TELEGRAM_BOT_TOKEN),
+            "telegram_bot_token": "****" if stored_tele_token else "",
             "telegram_chat_id": db_settings.get("telegram_chat_id", settings.TELEGRAM_CHAT_ID),
             "market_buy_time": f"{settings.MARKET_BUY_HOUR:02d}:{settings.MARKET_BUY_MINUTE:02d} WIB",
             "market_sell_time": f"{settings.MARKET_SELL_HOUR:02d}:{settings.MARKET_SELL_MINUTE:02d} WIB",
@@ -91,14 +97,14 @@ async def get_gui_dashboard_status():
 @router.post("/settings")
 async def update_gui_settings(payload: GuiSettingsPayload):
     """
-    Menyimpan pengaturan Alugara & Gemini API langsung ke database SQLite internal
+    Menyimpan pengaturan Alugara & Gemini API dengan enkripsi AES-256 langsung ke database SQLite internal
     """
     if payload.trading_pin is not None and payload.trading_pin != "":
-        set_setting("trading_pin", payload.trading_pin)
+        set_setting("trading_pin", encrypt_value(payload.trading_pin))
         settings.STOCKBIT_TRADING_PIN = payload.trading_pin
 
     if payload.gemini_api_key is not None and payload.gemini_api_key != "":
-        set_setting("gemini_api_key", payload.gemini_api_key)
+        set_setting("gemini_api_key", encrypt_value(payload.gemini_api_key))
         settings.GEMINI_API_KEY = payload.gemini_api_key
 
     if payload.gemini_model is not None:
@@ -121,8 +127,8 @@ async def update_gui_settings(payload: GuiSettingsPayload):
         set_setting("telegram_enabled", str(payload.telegram_enabled))
         settings.TELEGRAM_ENABLED = payload.telegram_enabled
 
-    if payload.telegram_bot_token is not None:
-        set_setting("telegram_bot_token", payload.telegram_bot_token)
+    if payload.telegram_bot_token is not None and payload.telegram_bot_token != "":
+        set_setting("telegram_bot_token", encrypt_value(payload.telegram_bot_token))
         settings.TELEGRAM_BOT_TOKEN = payload.telegram_bot_token
 
     if payload.telegram_chat_id is not None:
@@ -131,7 +137,7 @@ async def update_gui_settings(payload: GuiSettingsPayload):
 
     return {
         "success": True,
-        "message": "Pengaturan Alugara & Gemini AI berhasil disimpan ke database internal!"
+        "message": "Pengaturan Alugara & Gemini AI berhasil diamankan & disimpan ke database internal!"
     }
 
 @router.post("/test-gemini")
@@ -166,5 +172,5 @@ async def trigger_manual_sell():
 
 @router.post("/test-telegram")
 async def test_telegram_connection():
-    res = await notifier.send_message("🤖 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung!")
+    res = await notifier.send_message("🚀 <b>ALUGARA TELEGRAM NOTIFIER TEST</b>\n\nKoneksi Telegram Bot berhasil terhubung!")
     return {"success": res, "message": "Pesan berhasil dikirim ke Telegram!" if res else "Gagal mengirim. Cek Token & Chat ID."}

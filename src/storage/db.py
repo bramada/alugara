@@ -1,7 +1,7 @@
-import sqlite3
+﻿import sqlite3
 import os
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 
 DB_DIR = os.path.abspath("data")
@@ -80,7 +80,7 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ticker TEXT NOT NULL,
         strategy_name TEXT NOT NULL,
-        trade_outcome TEXT NOT NULL, -- 'WIN' or 'LOSS'
+        trade_outcome TEXT NOT NULL,
         profit_percent REAL NOT NULL,
         entry_price REAL,
         exit_price REAL,
@@ -88,6 +88,15 @@ def init_db():
         lesson_learned TEXT NOT NULL,
         market_condition TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Table 5: Web GUI App Sessions (Login Gate Security)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS app_sessions (
+        token TEXT PRIMARY KEY,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        expires_at TEXT NOT NULL
     )
     """)
 
@@ -121,6 +130,37 @@ def get_all_settings() -> Dict[str, str]:
     rows = cursor.fetchall()
     conn.close()
     return {r['key']: r['value'] for r in rows}
+
+# App Sessions Helpers
+def save_session(token: str, expires_at: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO app_sessions (token, expires_at) VALUES (?, ?)", (token, expires_at))
+    conn.commit()
+    conn.close()
+
+def get_session(token: str) -> Optional[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM app_sessions WHERE token = ?", (token,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def delete_session(token: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM app_sessions WHERE token = ?", (token,))
+    conn.commit()
+    conn.close()
+
+def clean_expired_sessions():
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM app_sessions WHERE expires_at < ?", (now_iso,))
+    conn.commit()
+    conn.close()
 
 # CRUD Active Positions
 def save_active_position(pos: Dict[str, Any]) -> int:
