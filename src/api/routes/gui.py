@@ -95,14 +95,14 @@ async def get_gui_dashboard_status():
         "screener_signals": signals,
         "settings": {
             "trading_pin": "****" if stored_pin else "",
-            "gemini_api_key": "****" if stored_gemini else "",
+            "gemini_api_key": stored_gemini or "",
             "gemini_model": db_settings.get("gemini_model", settings.GEMINI_MODEL),
             "ai_reasoning_enabled": db_settings.get("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED)).lower() == "true",
             "capital_per_strategy": float(db_settings.get("capital_per_strategy", settings.CAPITAL_PER_STRATEGY)),
             "auto_execute_enabled": db_settings.get("auto_execute_enabled", str(settings.AUTO_EXECUTE_ENABLED)).lower() == "true",
             "telegram_enabled": db_settings.get("telegram_enabled", str(settings.TELEGRAM_ENABLED)).lower() == "true",
-            "telegram_bot_token": "****" if stored_tele_token else "",
-            "telegram_chat_id": "****" if stored_tele_chat_id else "",
+            "telegram_bot_token": stored_tele_token or "",
+            "telegram_chat_id": stored_tele_chat_id or "",
             "market_buy_time": "09:00 - 15:45 WIB (Intraday Multi-Trade)",
             "market_sell_time": "Real-Time TP/SL (+1.5% s/d +3.5%)",
         }

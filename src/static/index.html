@@ -791,14 +791,14 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Bot Token</label>
-                <input type="password" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
-                       autocomplete="new-password" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_bot_token_cfg"
+                <input type="text" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
+                       autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_bot_token_cfg"
                        class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
               </div>
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Chat ID</label>
-                <input type="password" x-model="formSettings.telegram_chat_id" placeholder="Masukkan Chat ID"
-                       autocomplete="new-password" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_chat_id_cfg"
+                <input type="text" x-model="formSettings.telegram_chat_id" placeholder="Masukkan Chat ID (-100...)"
+                       autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_chat_id_cfg"
                        class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
               </div>
             </div>
@@ -964,6 +964,8 @@
           screener_signals: [],
           settings: {}
         },
+
+        settingsLoaded: false,
 
         formSettings: {
           trading_pin: '',
@@ -1164,12 +1166,19 @@
             const data = await res.json();
             if (data.success) {
               this.status = data;
-              this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
-              this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-3.7-flash';
-              this.formSettings.ai_reasoning_enabled = data.settings.ai_reasoning_enabled ?? true;
-              this.formSettings.telegram_enabled = data.settings.telegram_enabled || false;
-              this.formSettings.telegram_bot_token = data.settings.telegram_bot_token || '';
-              this.formSettings.telegram_chat_id = data.settings.telegram_chat_id || '';
+              // Hanya isi formSettings saat inisialisasi awal agar ketikan user tidak hilang tertimpa
+              if (!this.settingsLoaded && data.settings) {
+                this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
+                this.formSettings.gemini_model = data.settings.gemini_model || 'gemini-3.7-flash';
+                this.formSettings.ai_reasoning_enabled = data.settings.ai_reasoning_enabled ?? true;
+                this.formSettings.telegram_enabled = data.settings.telegram_enabled || false;
+                this.formSettings.telegram_bot_token = data.settings.telegram_bot_token || '';
+                this.formSettings.telegram_chat_id = data.settings.telegram_chat_id || '';
+                if (data.settings.gemini_api_key) {
+                  this.formSettings.gemini_api_key = data.settings.gemini_api_key;
+                }
+                this.settingsLoaded = true;
+              }
             }
           } catch (e) {
             console.error(e);
@@ -1298,9 +1307,7 @@
             }
             const data = await res.json();
             alert(data.message);
-            if (data.success) {
-              await this.fetchStatus();
-            }
+            // Nilai di input tetap dipertahankan utuh, tidak di-reset!
           } catch (e) {
             alert('Gagal: ' + e);
           }
