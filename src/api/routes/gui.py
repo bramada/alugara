@@ -67,6 +67,7 @@ async def get_gui_dashboard_status():
     stored_pin = decrypt_value(db_settings.get("trading_pin", "")) or settings.STOCKBIT_TRADING_PIN
     stored_gemini = decrypt_value(db_settings.get("gemini_api_key", "")) or settings.GEMINI_API_KEY
     stored_tele_token = decrypt_value(db_settings.get("telegram_bot_token", "")) or settings.TELEGRAM_BOT_TOKEN
+    stored_tele_chat_id = decrypt_value(db_settings.get("telegram_chat_id", "")) or settings.TELEGRAM_CHAT_ID
 
     return {
         "success": True,
@@ -100,7 +101,7 @@ async def get_gui_dashboard_status():
             "auto_execute_enabled": db_settings.get("auto_execute_enabled", str(settings.AUTO_EXECUTE_ENABLED)).lower() == "true",
             "telegram_enabled": db_settings.get("telegram_enabled", str(settings.TELEGRAM_ENABLED)).lower() == "true",
             "telegram_bot_token": "****" if stored_tele_token else "",
-            "telegram_chat_id": db_settings.get("telegram_chat_id", settings.TELEGRAM_CHAT_ID),
+            "telegram_chat_id": "****" if stored_tele_chat_id else "",
             "market_buy_time": "09:00 - 15:45 WIB (Intraday Multi-Trade)",
             "market_sell_time": "Real-Time TP/SL (+1.5% s/d +3.5%)",
         }
@@ -143,8 +144,8 @@ async def update_gui_settings(payload: GuiSettingsPayload):
         set_setting("telegram_bot_token", encrypt_value(payload.telegram_bot_token))
         settings.TELEGRAM_BOT_TOKEN = payload.telegram_bot_token
 
-    if payload.telegram_chat_id is not None:
-        set_setting("telegram_chat_id", payload.telegram_chat_id)
+    if payload.telegram_chat_id is not None and payload.telegram_chat_id != "" and payload.telegram_chat_id != "****":
+        set_setting("telegram_chat_id", encrypt_value(payload.telegram_chat_id))
         settings.TELEGRAM_CHAT_ID = payload.telegram_chat_id
 
     return {

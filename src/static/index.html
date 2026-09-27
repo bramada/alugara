@@ -89,6 +89,17 @@
       border-color: #a855f7;
       box-shadow: 0 0 14px rgba(168, 85, 247, 0.5);
     }
+
+    /* Prevent browser autofill from turning inputs white & hijacking colors */
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover, 
+    input:-webkit-autofill:focus, 
+    input:-webkit-autofill:active {
+      -webkit-box-shadow: 0 0 0 1000px #1e293b inset !important;
+      -webkit-text-fill-color: #f8fafc !important;
+      caret-color: #f8fafc !important;
+      transition: background-color 5000s ease-in-out 0s;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-white" x-data="alugaraApp()" x-init="initDashboard()" x-cloak>
@@ -717,12 +728,14 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Bot Token</label>
-                <input type="text" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
+                <input type="password" x-model="formSettings.telegram_bot_token" placeholder="123456:ABC-DEF..."
+                       autocomplete="new-password" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_bot_token_cfg"
                        class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
               </div>
               <div>
                 <label class="block text-xs font-semibold text-slate-300 mb-1.5">Telegram Chat ID</label>
-                <input type="text" x-model="formSettings.telegram_chat_id" placeholder="987654321"
+                <input type="password" x-model="formSettings.telegram_chat_id" placeholder="Masukkan Chat ID"
+                       autocomplete="new-password" autocorrect="off" spellcheck="false" data-lpignore="true" name="tele_chat_id_cfg"
                        class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-cyan-400 font-mono">
               </div>
             </div>
@@ -736,18 +749,22 @@
           <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-3">
             <h3 class="text-sm font-bold text-cyan-400">Keamanan Password Aplikasi</h3>
             <p class="text-xs text-slate-400">Ganti Password yang digunakan untuk membuka Dashboard Alugara.</p>
+            
+            <!-- Hidden dummy input to satisfy and isolate browser password managers from leaking username to other fields -->
+            <input type="text" name="username" autocomplete="username" class="hidden" style="display:none !important;" tabindex="-1" aria-hidden="true">
+
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <input type="password" x-model="changePwd.current" placeholder="Password Saat Ini"
-                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+                <input type="password" x-model="changePwd.current" autocomplete="current-password" placeholder="Password Saat Ini"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono">
               </div>
               <div>
-                <input type="password" x-model="changePwd.new_pwd" placeholder="Password Baru"
-                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+                <input type="password" x-model="changePwd.new_pwd" autocomplete="new-password" placeholder="Password Baru"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono">
               </div>
               <div>
-                <input type="password" x-model="changePwd.confirm_pwd" placeholder="Ulangi Password Baru"
-                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400">
+                <input type="password" x-model="changePwd.confirm_pwd" autocomplete="new-password" placeholder="Ulangi Password Baru"
+                       class="w-full px-3.5 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono">
               </div>
             </div>
             <button @click="handleChangePassword()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-bold transition-all">
