@@ -290,7 +290,7 @@ PESAN PENGGUNA TERBARU:
 PETUNJUK JAWABAN:
 - Jawablah dengan jelas, ringkas, profesional, dan to the point dalam Bahasa Indonesia.
 - Jika pengguna bertanya tentang saham, berikan pandangan berbasis teknikal, volume, atau manajemen risiko yang baik.
-- Anda dapat menyarankan penggunaan awalan 'evo:' jika pengguna ingin menyimpan aturan tertentu ke memori permanen bot.
+- DILARANG menambahkan pesan tips, catatan pengingat, atau embel-embel tentang awalan 'evo:' / Buku Pintar di akhir jawaban. Jawab hanya apa yang ditanyakan secara bersih dan fokus.
 """
             raw_res = await self.call_gemini(prompt)
             if raw_res:
