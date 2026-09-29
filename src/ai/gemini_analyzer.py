@@ -1,3 +1,27 @@
+
+def _sanitize_discuss_reply(text: str) -> str:
+    """Membersihkan pesan tips / embel-embel evo secara tuntas dari respon AI"""
+    if not text:
+        return ""
+    import re
+    cleaned = text.strip()
+    # Hapus baris/paragraf penutup yang mengandung tips evo
+    lines = cleaned.split("\n")
+    filtered_lines = []
+    for line in lines:
+        l_lower = line.lower()
+        if "evo:" in l_lower and ("awalan" in l_lower or "buku pintar" in l_lower or "catatan" in l_lower or "tip" in l_lower or "ingat" in l_lower or "memori" in l_lower):
+            continue
+        filtered_lines.append(line)
+    
+    res = "\n".join(filtered_lines).strip()
+    
+    # Hapus kurung penutup sisa jika ada
+    res = re.sub(r'\n*\s*\([\s\S]*?evo:[\s\S]*?\)\s*$', '', res, flags=re.IGNORECASE).strip()
+    res = re.sub(r'\n*\s*\*\*[\s\S]*?evo:[\s\S]*?\*\*\s*$', '', res, flags=re.IGNORECASE).strip()
+    res = re.sub(r'\n*\s*\*[\s\S]*?evo:[\s\S]*?\*\s*$', '', res, flags=re.IGNORECASE).strip()
+    return res
+
 # -*- coding: utf-8 -*-
 import os
 import json
@@ -200,7 +224,7 @@ Kembalikan HANYA format JSON murni tanpa markdown:
                     strategy = data.get("strategy_name", "Evo: Aturan Pengguna")
                     lesson = data.get("lesson_learned", instruction)
                     analysis = data.get("ai_analysis", f"Aturan diajarkan oleh pengguna: {instruction}")
-                    reply = data.get("response_to_user", f"Kaidah baru untuk #{ticker} berhasil dipelajari dan disimpan ke Buku Pintar AI.")
+                    reply = _sanitize_discuss_reply(data.get("response_to_user", f"Kaidah baru untuk #{ticker} berhasil dipelajari dan disimpan ke Buku Pintar AI."))
 
                     # Simpan permanen ke tabel ai_market_memories
                     save_ai_memory(
@@ -296,7 +320,7 @@ PETUNJUK JAWABAN:
             if raw_res:
                 return {
                     "success": True,
-                    "reply": raw_res.strip(),
+                    "reply": _sanitize_discuss_reply(raw_res.strip()),
                     "is_evolved": False
                 }
             return {
