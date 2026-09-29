@@ -56,12 +56,11 @@ Anda dapat menghentikan server dengan beberapa cara berikut:
 ## 🌟 Fitur Utama (100% Mandiri)
 
 1. **Internal Quantitative Screener**: Memindai bursa saham IDX secara mandiri dari feed data pasar real-time.
-2. **Google Gemini AI Reasoning**: Analisis mendalam multi-faktor dan penyaring jebakan bandar dengan sistem fallback otomatis.
-3. **Gemini Quota & Rate Limit Monitor**: Pemantau kuota real-time (1,500 RPD harian & 15 RPM) bergaya Antigravity.
-4. **Internal SQLite Database (`data/alugara.db`)**: Menyimpan posisi saham aktif, riwayat transaksi, dan memori AI dengan enkripsi AES-256.
-5. **Automated Market Scheduler**:
+2. **Google Gemini AI Reasoning**: Analisis mendalam multi-faktor dan penyaring jebakan bandar dengan sistem multi-model auto-fallback.
+3. **Internal SQLite Database (`data/alugara.db`)**: Menyimpan posisi saham aktif, riwayat transaksi, dan memori AI dengan enkripsi AES-256.
+4. **Automated Market Scheduler**:
    - **Intraday Scanning**: Memindai peluang saham sepanjang jam bursa.
    - **09:10 WIB**: Evaluasi & Eksekusi otomatis Jual Pagi (Take Profit / Stop Loss).
    - **15:40 WIB**: Eksekusi otomatis Beli Sore (Stockbit Web).
-6. **Persistent Session & Stealth Driver**: Login pairing 1x saja, sesi tersimpan permanen.
-7. **Direct Telegram Alerts**: Notifikasi live dan konfirmasi order langsung ke grup/chat Telegram Anda.
+5. **Persistent Session & Stealth Driver**: Login pairing 1x saja, sesi tersimpan permanen.
+6. **Direct Telegram Alerts**: Notifikasi live dan konfirmasi order langsung ke grup/chat Telegram Anda.

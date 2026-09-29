@@ -87,7 +87,6 @@ async def get_gui_dashboard_status(background_tasks: BackgroundTasks):
     stored_tele_token = decrypt_value(db_settings.get("telegram_bot_token", "")) or settings.TELEGRAM_BOT_TOKEN
     stored_tele_chat_id = decrypt_value(db_settings.get("telegram_chat_id", "")) or settings.TELEGRAM_CHAT_ID
 
-    quota_data = get_ai_quota_stats()
 
     return {
         "success": True,
@@ -112,7 +111,6 @@ async def get_gui_dashboard_status(background_tasks: BackgroundTasks):
         "recent_trades": logs,
         "ai_memories": ai_memories,
         "screener_signals": signals,
-        "gemini_quota": quota_data,
         "settings": {
             "trading_pin": "****" if stored_pin else "",
             "gemini_api_key": stored_gemini or "",
@@ -126,14 +124,6 @@ async def get_gui_dashboard_status(background_tasks: BackgroundTasks):
             "market_buy_time": "09:00 - 15:45 WIB (Intraday Multi-Trade)",
             "market_sell_time": "Real-Time TP/SL (+1.5% s/d +3.5%)",
         }
-    }
-
-@router.get("/quota")
-async def get_gemini_quota_endpoint():
-    """Mengambil metrik kuota AI Gemini real-time bergaya Antigravity IDE"""
-    return {
-        "success": True,
-        "gemini_quota": get_ai_quota_stats()
     }
 
 @router.post("/settings")
