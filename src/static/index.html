@@ -697,7 +697,7 @@
                   
                   <!-- Message Header: Sender & Time -->
                   <div class="flex items-center gap-2 text-[10px] text-slate-400 px-1 font-mono">
-                    <span class="font-bold" :class="msg.role === 'user' ? 'text-cyan-400' : 'text-purple-400'" x-text="msg.role === 'user' ? 'Anda (Trader)' : 'Alugara AI'"></span>
+                    <span class="font-bold" :class="msg.role === 'user' ? 'text-cyan-400' : 'text-purple-400'" x-text="msg.role === 'user' ? 'Saya' : 'Alugara AI'"></span>
                     <span x-show="msg.is_evo" class="px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 text-[9px]">⚡ EVO RULE</span>
                     <span x-text="msg.time"></span>
                   </div>
