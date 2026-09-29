@@ -265,6 +265,14 @@ def save_ai_memory(
     conn.commit()
     conn.close()
 
+
+def delete_ai_memory(memory_id: int):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ai_market_memories WHERE id = ?", (memory_id,))
+    conn.commit()
+    conn.close()
+
 def get_top_ai_memories(limit: int = 10) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()

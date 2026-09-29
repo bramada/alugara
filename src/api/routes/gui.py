@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from src.config.settings import settings
 from src.storage.db import (
     get_all_settings,
+    delete_ai_memory,
     get_ai_quota_stats,
     set_setting,
     get_active_positions,
@@ -267,3 +268,30 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
                 return {"success": False, "message": f"[ERROR] Gagal mengirim ke Telegram: {err_desc}"}
     except Exception as e:
         return {"success": False, "message": f"[ERROR] Error koneksi: {e}"}
+
+
+class DiscussPayload(BaseModel):
+    message: str
+    history: Optional[List[Dict[str, str]]] = None
+
+@router.post("/discuss")
+async def discuss_with_ai(payload: DiscussPayload):
+    """
+    Endpoint interaktif Menu Discuss:
+    - Pesan dengan awalan 'evo:' akan mengajari AI dan menyimpan aturan ke Buku Pintar AI
+    - Pesan biasa menjadi sesi tanya jawab konsultasi trading
+    """
+    if not payload.message or not payload.message.strip():
+        raise HTTPException(status_code=400, detail="Pesan tidak boleh kosong.")
+    
+    result = await ai_analyzer.discuss_and_evolve(
+        user_message=payload.message,
+        chat_history=payload.history
+    )
+    return result
+
+@router.delete("/memories/{memory_id}")
+async def remove_ai_memory(memory_id: int):
+    """Menghapus memori tertentu dari Buku Pintar AI"""
+    delete_ai_memory(memory_id)
+    return {"success": True, "message": "Memori berhasil dihapus dari Buku Pintar AI."}

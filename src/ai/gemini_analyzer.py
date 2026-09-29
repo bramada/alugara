@@ -9,13 +9,14 @@ from src.storage.db import (
     get_setting,
     get_top_ai_memories,
     save_ai_memory,
-    log_ai_usage
+    log_ai_usage,
+    get_active_positions
 )
 
 class GeminiAnalyzer:
     """
     Mesin Analisis AI Mendalam berbasis Google Gemini
-    Dilengkapi Multi-Model Auto-Fallback & Long-Term Memory Playbook.
+    Dilengkapi Multi-Model Auto-Fallback, Continuous Coaching Memory ('evo:'), dan Long-Term Memory Playbook.
     """
 
     # Model resmi Google AI Studio berkinerja tinggi
@@ -137,6 +138,173 @@ class GeminiAnalyzer:
 
         return None
 
+    async def discuss_and_evolve(
+        self,
+        user_message: str,
+        chat_history: Optional[List[Dict[str, str]]] = None,
+        context_data: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Menu Discuss & AI Coaching:
+        - Jika diawali 'evo:' -> Mengajari AI kaidah trading baru, otomatis disimpan ke Buku Pintar AI.
+        - Jika tanpa 'evo:' -> Diskusi & tanya jawab cerdas tanpa menyimpan ke memori.
+        """
+        if not self.is_enabled():
+            return {
+                "success": False,
+                "reply": "Google Gemini AI belum aktif atau API Key belum diisi. Silakan masukkan Gemini API Key di menu Pengaturan & Keamanan terlebih dahulu.",
+                "is_evolved": False
+            }
+
+        msg = user_message.strip()
+        is_evo = msg.lower().startswith("evo:")
+
+        if is_evo:
+            # Mode Coaching / Mengajari AI
+            instruction = msg[4:].strip()
+            prompt = f"""
+Anda adalah Alugara AI Trading Engine untuk Bursa Efek Indonesia (IDX).
+Pengguna (Master Trader) sedang mengajari Anda kaidah/pantangan trading baru melalui instruksi coaching 'evo:'.
+
+INSTRUKSI PENGGUNA:
+"{instruction}"
+
+TUGAS ANDA:
+1. Pahami instruksi ini secara mendalam untuk diterapkan pada evaluasi & penyaringan saham IDX.
+2. Tentukan 'ticker' emiten terkait (misal "BBCA", "ANTM", atau "GLOBAL" jika berlaku untuk semua saham).
+3. Tentukan 'strategy_name' (misal "Evo: Filter Bandar", "Evo: Price Action", atau nama strategi yang relevan).
+4. Rumuskan 'lesson_learned' (1-2 kalimat tegas dan ringkas berisi aturan emas/pantangan yang wajib Anda patuhi saat trading).
+5. Rumuskan 'ai_analysis' (penjelasan mengapa aturan ini penting dan bagaimana Anda akan menerapkannya saat menyaring saham).
+6. Rumuskan 'response_to_user' (konfirmasi ramah dalam Bahasa Indonesia bahwa Anda telah menyerap aturan ini dan mengabadikannya ke Buku Pintar AI).
+
+Kembalikan HANYA format JSON murni tanpa markdown:
+{{
+  "is_evolved": true,
+  "ticker": "GLOBAL",
+  "strategy_name": "Evo: Aturan Pengguna",
+  "lesson_learned": "...",
+  "ai_analysis": "...",
+  "response_to_user": "..."
+}}
+"""
+            raw_res = await self.call_gemini(prompt)
+            if raw_res:
+                try:
+                    clean_json = raw_res.strip()
+                    if clean_json.startswith("```json"): clean_json = clean_json[7:]
+                    if clean_json.startswith("```"): clean_json = clean_json[3:]
+                    if clean_json.endswith("```"): clean_json = clean_json[:-3]
+                    
+                    data = json.loads(clean_json.strip())
+                    ticker = data.get("ticker", "GLOBAL").upper()
+                    strategy = data.get("strategy_name", "Evo: Aturan Pengguna")
+                    lesson = data.get("lesson_learned", instruction)
+                    analysis = data.get("ai_analysis", f"Aturan diajarkan oleh pengguna: {instruction}")
+                    reply = data.get("response_to_user", f"Kaidah baru untuk #{ticker} berhasil dipelajari dan disimpan ke Buku Pintar AI.")
+
+                    # Simpan permanen ke tabel ai_market_memories
+                    save_ai_memory(
+                        ticker=ticker,
+                        strategy_name=strategy,
+                        trade_outcome="COACHED",
+                        profit_percent=0.0,
+                        entry_price=0.0,
+                        exit_price=0.0,
+                        ai_analysis=analysis,
+                        lesson_learned=lesson,
+                        market_condition="User Evo Rule"
+                    )
+                    logger.info(f"Kaidah Evo baru untuk #{ticker} berhasil disimpan ke Buku Pintar AI: {lesson}")
+
+                    return {
+                        "success": True,
+                        "reply": reply,
+                        "is_evolved": True,
+                        "evolved_data": {
+                            "ticker": ticker,
+                            "strategy_name": strategy,
+                            "lesson_learned": lesson,
+                            "ai_analysis": analysis
+                        }
+                    }
+                except Exception as e:
+                    logger.error(f"Gagal memproses instruksi evo: {e}")
+                    # Fallback simpan langsung
+                    save_ai_memory(
+                        ticker="GLOBAL",
+                        strategy_name="Evo: Aturan Pengguna",
+                        trade_outcome="COACHED",
+                        profit_percent=0.0,
+                        entry_price=0.0,
+                        exit_price=0.0,
+                        ai_analysis=instruction,
+                        lesson_learned=instruction,
+                        market_condition="User Evo Rule"
+                    )
+                    return {
+                        "success": True,
+                        "reply": f"Kaidah baru berhasil dicatat dan disimpan ke Buku Pintar AI: '{instruction}'",
+                        "is_evolved": True,
+                        "evolved_data": {
+                            "ticker": "GLOBAL",
+                            "strategy_name": "Evo: Aturan Pengguna",
+                            "lesson_learned": instruction,
+                            "ai_analysis": instruction
+                        }
+                    }
+            return {
+                "success": False,
+                "reply": "Maaf, terjadi gangguan saat memproses instruksi evo ke Gemini AI. Silakan periksa koneksi atau API Key Anda.",
+                "is_evolved": False
+            }
+
+        else:
+            # Mode Diskusi / Q&A Standar (Tanpa Simpan ke Memori)
+            history_text = ""
+            if chat_history:
+                for h in chat_history[-6:]:
+                    role = "Pengguna" if h.get("role") == "user" else "Alugara AI"
+                    history_text += f"{role}: {h.get('content')}\n"
+
+            positions = get_active_positions()
+            pos_summary = ", ".join([f"{p['ticker']} ({p['lots']} lot @ Rp {p['entry_price']:,})" for p in positions]) if positions else "Tidak ada (Cash 100%)"
+            
+            memories = get_top_ai_memories(limit=8)
+            mem_summary = "\n".join([f"- [#{m['ticker']}]: {m['lesson_learned']}" for m in memories]) if memories else "Belum ada kaidah tercatat."
+
+            prompt = f"""
+Anda adalah Alugara AI Co-Pilot & Quantitative Trading Assistant untuk Bursa Efek Indonesia (IDX).
+Karakter Anda: Cerdas, disiplin, berorientasi risiko modal (filosofi: cuan berapa pun asal aman dan konsisten).
+
+KONTEKS SISTEM ALUGARA SAAT INI:
+- Posisi Saham Aktif: {pos_summary}
+- Kaidah di Buku Pintar AI:
+{mem_summary}
+
+RIWAYAT PERCAKAPAN:
+{history_text}
+
+PESAN PENGGUNA TERBARU:
+"{msg}"
+
+PETUNJUK JAWABAN:
+- Jawablah dengan jelas, ringkas, profesional, dan to the point dalam Bahasa Indonesia.
+- Jika pengguna bertanya tentang saham, berikan pandangan berbasis teknikal, volume, atau manajemen risiko yang baik.
+- Anda dapat menyarankan penggunaan awalan 'evo:' jika pengguna ingin menyimpan aturan tertentu ke memori permanen bot.
+"""
+            raw_res = await self.call_gemini(prompt)
+            if raw_res:
+                return {
+                    "success": True,
+                    "reply": raw_res.strip(),
+                    "is_evolved": False
+                }
+            return {
+                "success": False,
+                "reply": "Maaf, Gemini AI tidak dapat merespons saat ini. Coba periksa koneksi internet atau ganti model AI di menu Pengaturan.",
+                "is_evolved": False
+            }
+
     async def analyze_and_rank_candidates(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         FASE 1 (Pre-Trade AI Gatekeeper):
@@ -151,12 +319,12 @@ class GeminiAnalyzer:
             return candidates
 
         # 1. Ambil Buku Pintar Memori Masa Lalu (RAG Memory Context)
-        past_memories = get_top_ai_memories(limit=8)
+        past_memories = get_top_ai_memories(limit=10)
         memory_context = ""
         if past_memories:
-            memory_context = "BUKU PINTAR PENGALAMAN TRADE SEBELUMNYA:\n"
+            memory_context = "BUKU PINTAR PENGALAMAN & ATURAN TRADE (RAG MEMORY):\n"
             for m in past_memories:
-                memory_context += f"- [Pola #{m['ticker']} ({m['trade_outcome']} {m['profit_percent']:+.1f}%)]: {m['lesson_learned']}\n"
+                memory_context += f"- [Pola #{m['ticker']} ({m['strategy_name']})]: {m['lesson_learned']}\n"
 
         prompt = f"""
 Anda adalah Senior Quantitative Trader & Chief Risk Officer di Bursa Efek Indonesia (IDX) untuk sistem Auto-Trading Alugara.
@@ -173,7 +341,8 @@ PRINSIP SELEKSI:
 2. Hindari saham yang rentan guyuran bandar (fake bid, distribusi terselubung, pom-pom).
 3. Hanya rekomendasikan jika Anda yakin saham ini aman dan berpotensi naik (ai_score >= 75).
 4. Berikan 'ai_score' (1-100), 'strategy_name', dan 'ai_reasoning' singkat (1-2 kalimat).
-5. Urutkan dari ai_score tertinggi ke terendah.
+5. Patuhi semua aturan di Buku Pintar Pengalaman.
+6. Urutkan dari ai_score tertinggi ke terendah.
 
 {memory_context}
 
@@ -195,7 +364,6 @@ Kembalikan HANYA format JSON murni array of objects tanpa markdown:
   }}
 ]
 """
-
         logger.info("Mengirim data kandidat saham ke Gemini AI untuk analisis mendalam...")
         raw_response = await self.call_gemini(prompt)
 
