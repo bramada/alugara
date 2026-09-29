@@ -1566,6 +1566,7 @@
           await this.checkAuthStatus();
           if (this.auth.is_authenticated) {
             await this.fetchStatus();
+            await this.fetchChatHistory();
             setInterval(() => {
               if (this.auth.is_authenticated) {
                 this.fetchStatus();
@@ -1996,11 +1997,42 @@
           }
         },
 
-        clearChat() {
+        
+        async fetchChatHistory() {
+          try {
+            const res = await fetch('/api/v1/gui/discuss/history');
+            if (res.status === 401) return;
+            const data = await res.json();
+            if (data.success && Array.isArray(data.messages)) {
+              this.chatMessages = data.messages;
+              this.scrollToChatBottom();
+            }
+          } catch (e) {
+            console.error('Failed to load chat history:', e);
+          }
+        },
+
+        async clearChat() {
+          const ok = await this.confirmDialog({
+            title: 'Bersihkan Riwayat Percakapan',
+            message: 'Hapus seluruh riwayat chat Discuss secara permanen dari server?',
+            confirmText: 'Bersihkan',
+            cancelText: 'Batal',
+            type: 'rose'
+          });
+          if (!ok) return;
+
           this.chatMessages = [];
           this.chatInput = '';
-          this.notify('Riwayat percakapan telah dibersihkan.', 'info', 'Chat');
+          try {
+            localStorage.removeItem('alugara_discuss_chat');
+            await fetch('/api/v1/gui/discuss/history', { method: 'DELETE' });
+            this.notify('Riwayat percakapan telah dibersihkan secara permanen.', 'info', 'Chat');
+          } catch (e) {
+            console.error(e);
+          }
         },
+
 
         async sendChatMessage() {
           const text = (this.chatInput || '').trim();

@@ -10,6 +10,9 @@ from src.config.settings import settings
 from src.storage.db import (
     get_all_settings,
     delete_ai_memory,
+    save_discuss_message,
+    get_discuss_history,
+    clear_discuss_history,
     get_ai_quota_stats,
     set_setting,
     get_active_positions,
@@ -272,7 +275,20 @@ async def test_telegram_connection(payload: Optional[TestTelegramPayload] = None
 
 class DiscussPayload(BaseModel):
     message: str
+    time: Optional[str] = None
     history: Optional[List[Dict[str, str]]] = None
+
+@router.get("/discuss/history")
+async def get_chat_history():
+    """Mengambil seluruh riwayat percakapan Discuss yang tersimpan di database SQLite"""
+    messages = get_discuss_history(limit=150)
+    return {"success": True, "messages": messages}
+
+@router.delete("/discuss/history")
+async def clear_chat_history_db():
+    """Menghapus seluruh riwayat percakapan Discuss dari database SQLite"""
+    clear_discuss_history()
+    return {"success": True, "message": "Riwayat percakapan berhasil dibersihkan dari database."}
 
 @router.post("/discuss")
 async def discuss_with_ai(payload: DiscussPayload):
@@ -280,14 +296,43 @@ async def discuss_with_ai(payload: DiscussPayload):
     Endpoint interaktif Menu Discuss:
     - Pesan dengan awalan 'evo:' akan mengajari AI dan menyimpan aturan ke Buku Pintar AI
     - Pesan biasa menjadi sesi tanya jawab konsultasi trading
+    - Seluruh percakapan otomatis tersimpan permanen ke SQLite (cross-browser sync)
     """
     if not payload.message or not payload.message.strip():
         raise HTTPException(status_code=400, detail="Pesan tidak boleh kosong.")
     
+    # User message timestamp (WIB)
+    now_jkt = datetime.now(timezone(timedelta(hours=7)))
+    user_time_str = payload.time or now_jkt.strftime("%H:%M WIB")
+    is_evo = payload.message.strip().lower().startswith("evo:")
+
+    # Save user message to DB
+    save_discuss_message(
+        role="user",
+        content=payload.message.strip(),
+        is_evo=is_evo,
+        time_str=user_time_str
+    )
+
     result = await ai_analyzer.discuss_and_evolve(
         user_message=payload.message,
         chat_history=payload.history
     )
+
+    # AI reply timestamp (WIB)
+    ai_now_jkt = datetime.now(timezone(timedelta(hours=7)))
+    ai_time_str = ai_now_jkt.strftime("%H:%M WIB")
+
+    # Save AI reply to DB
+    save_discuss_message(
+        role="assistant",
+        content=result.get("reply", ""),
+        is_evo=False,
+        is_evolved=result.get("is_evolved", False),
+        evolved_data=result.get("evolved_data"),
+        time_str=ai_time_str
+    )
+
     return result
 
 @router.delete("/memories/{memory_id}")

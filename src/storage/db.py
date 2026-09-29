@@ -102,6 +102,21 @@ def init_db():
     )
     """)
 
+    
+    # Table 7: Persistent AI Discuss Chat History (Cross-Browser & Multi-Device)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS ai_discuss_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        is_evo BOOLEAN DEFAULT 0,
+        is_evolved BOOLEAN DEFAULT 0,
+        evolved_data TEXT,
+        time_str TEXT NOT NULL,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
     # Table 6: AI Usage Logs & Quota Tracking
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS ai_usage_logs (
@@ -415,3 +430,54 @@ def get_ai_quota_stats() -> Dict[str, Any]:
             "rpm_subtext": "You have used some of your 5-hour limit, it will fully refresh in 4 hours, 50 minutes.",
             "status_text": "Optimal"
         }
+
+
+def save_discuss_message(role: str, content: str, is_evo: bool = False, is_evolved: bool = False, evolved_data: Optional[Dict[str, Any]] = None, time_str: str = "") -> int:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    evolved_json = json.dumps(evolved_data) if evolved_data else None
+    cursor.execute("""
+        INSERT INTO ai_discuss_messages (role, content, is_evo, is_evolved, evolved_data, time_str)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (role, content, 1 if is_evo else 0, 1 if is_evolved else 0, evolved_json, time_str))
+    conn.commit()
+    msg_id = cursor.lastrowid
+    conn.close()
+    return msg_id
+
+def get_discuss_history(limit: int = 100) -> List[Dict[str, Any]]:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, role, content, is_evo, is_evolved, evolved_data, time_str, created_at
+        FROM ai_discuss_messages
+        ORDER BY id ASC
+        LIMIT ?
+    """, (limit,))
+    rows = cursor.fetchall()
+    conn.close()
+    result = []
+    for r in rows:
+        evolved_dict = None
+        if r["evolved_data"]:
+            try:
+                evolved_dict = json.loads(r["evolved_data"])
+            except Exception:
+                evolved_dict = None
+        result.append({
+            "id": r["id"],
+            "role": r["role"],
+            "content": r["content"],
+            "is_evo": bool(r["is_evo"]),
+            "is_evolved": bool(r["is_evolved"]),
+            "evolved_data": evolved_dict,
+            "time": r["time_str"]
+        })
+    return result
+
+def clear_discuss_history():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM ai_discuss_messages")
+    conn.commit()
+    conn.close()
