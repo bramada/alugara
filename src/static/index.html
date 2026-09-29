@@ -1883,7 +1883,8 @@
             // Nilai di input tetap dipertahankan utuh, tidak di-reset!
           } catch (e) {
             this.notify('Gagal: ' + e, 'error', 'Uji Coba Gagal');
-          },
+          }
+        },
 
         scrollToChatBottom() {
           this.$nextTick(() => {
@@ -2019,8 +2020,6 @@
           } catch (e) {
             this.notify('Gagal menghapus kaidah: ' + e, 'error', 'Error');
           }
-        }
-
         }
       }
     }
