@@ -1352,7 +1352,14 @@
       return {
         activeTab: 'screener',
         loading: false,
-        chatMessages: [],
+        chatMessages: (function() {
+          try {
+            const saved = localStorage.getItem('alugara_discuss_chat');
+            return saved ? JSON.parse(saved) : [];
+          } catch (e) {
+            return [];
+          }
+        })(),
         chatInput: '',
         chatLoading: false,
         showEvoHelp: false,
@@ -1555,6 +1562,7 @@
             this.notify(str, type);
           };
           this.startClock();
+          if (this.chatMessages && this.chatMessages.length > 0) { this.scrollToChatBottom(); }
           await this.checkAuthStatus();
           if (this.auth.is_authenticated) {
             await this.fetchStatus();
@@ -1977,6 +1985,15 @@
               el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
             }
           });
+        },
+
+        
+        saveChatMessages() {
+          try {
+            localStorage.setItem('alugara_discuss_chat', JSON.stringify(this.chatMessages || []));
+          } catch (e) {
+            console.error('Failed to save chat to localStorage:', e);
+          }
         },
 
         clearChat() {
