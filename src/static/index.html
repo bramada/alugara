@@ -1705,7 +1705,7 @@
         startClock() {
           setInterval(() => {
             const now = new Date();
-            const formatter = new Intl.DateTimeFormat('id-ID', {
+            const formatter = new Intl.DateTimeFormat('en-GB', {
               timeZone: 'Asia/Jakarta',
               hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
             });
@@ -1990,7 +1990,7 @@
           if (!text || this.chatLoading) return;
 
           const now = new Date();
-          const timeStr = new Intl.DateTimeFormat('id-ID', {
+          const timeStr = new Intl.DateTimeFormat('en-GB', {
             timeZone: 'Asia/Jakarta',
             hour: '2-digit', minute: '2-digit', hour12: false
           }).format(now) + ' WIB';
@@ -2032,7 +2032,7 @@
 
             const data = await res.json();
             
-            const replyTime = new Intl.DateTimeFormat('id-ID', {
+            const replyTime = new Intl.DateTimeFormat('en-GB', {
               timeZone: 'Asia/Jakarta',
               hour: '2-digit', minute: '2-digit', hour12: false
             }).format(new Date()) + ' WIB';
