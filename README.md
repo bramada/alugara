@@ -47,9 +47,12 @@ Anda dapat menghentikan server dengan beberapa cara berikut:
 | `python cli.py stop` | **Stop Server**: Menghentikan server Alugara yang sedang berjalan pada port 8000 |
 | `python cli.py login` | Membuka jendela Google Chrome interaktif untuk login/pairing ke Stockbit |
 | `python cli.py check-session` | Memeriksa apakah sesi login Stockbit masih aktif dan valid |
+| `python cli.py export-session` | **Ekspor Sesi**: Menyimpan sesi Stockbit ke file terenkripsi AES-256 (`.alugara`) |
+| `python cli.py import-session` | **Impor Sesi**: Memasang file sesi terenkripsi (`.alugara`) ke sistem & database |
 | `python cli.py scan` | Menjalankan pemindaian sinyal saham intraday BEI secara instan |
 | `python cli.py positions` | Menampilkan daftar seluruh posisi saham aktif di portofolio internal |
 | `python cli.py history` | Melihat riwayat transaksi jual/beli beserta keuntungan/kerugian (P/L) |
+| `python cli.py reset-password` | **Reset Password**: Mengatur ulang Username & Password login Web GUI Dashboard |
 
 ---
 
@@ -62,5 +65,5 @@ Anda dapat menghentikan server dengan beberapa cara berikut:
    - **Intraday Scanning**: Memindai peluang saham sepanjang jam bursa.
    - **09:10 WIB**: Evaluasi & Eksekusi otomatis Jual Pagi (Take Profit / Stop Loss).
    - **15:40 WIB**: Eksekusi otomatis Beli Sore (Stockbit Web).
-5. **Persistent Session & Stealth Driver**: Login pairing 1x saja, sesi tersimpan permanen.
+5. **Persistent Session & Stealth Driver**: Login pairing 1x saja, sesi tersimpan permanen di file dan database dengan fitur **Ekspor/Impor Terenkripsi (.alugara)** untuk kemudahan pemindahan ke server VPS Linux.
 6. **Direct Telegram Alerts**: Notifikasi live dan konfirmasi order langsung ke grup/chat Telegram Anda.

@@ -34,6 +34,55 @@ def check_session():
         click.secho(f"[ERROR] {msg}", fg="red", bold=True)
 
 @cli.command()
+@click.option("--passphrase", "-p", default="", help="Passphrase pengaman untuk enkripsi (opsional)")
+@click.option("--output", "-o", default="", help="Path file output (.alugara)")
+def export_session(passphrase, output):
+    """Ekspor sesi Stockbit saat ini ke file terenkripsi (.alugara)"""
+    import json
+    driver = StockbitDriver(headless=True)
+    ok, pkg, msg = driver.export_session_package(passphrase=passphrase if passphrase else None)
+    if not ok:
+        click.secho(f"[ERROR] {msg}", fg="red", bold=True)
+        return
+    
+    if not output:
+        from datetime import datetime
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output = os.path.join(driver.session_dir, f"stockbit_session_{ts}.alugara")
+    
+    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(pkg, f, indent=2)
+    
+    click.secho(f"[OK] {msg}", fg="green", bold=True)
+    click.secho(f"File sesi tersimpan di: {output}", fg="cyan")
+
+@cli.command()
+@click.argument("filepath", type=click.Path(exists=True))
+@click.option("--passphrase", "-p", default="", help="Passphrase pengaman jika file terproteksi")
+def import_session(filepath, passphrase):
+    """Impor file sesi Stockbit terenkripsi (.alugara) ke dalam sistem & database"""
+    import json
+    driver = StockbitDriver(headless=True)
+    try:
+        with open(filepath, "r", encoding="utf-8") as f:
+            pkg = json.load(f)
+    except Exception as e:
+        click.secho(f"[ERROR] Gagal membaca file: {e}", fg="red", bold=True)
+        return
+
+    ok, msg = driver.import_session_package(pkg, passphrase=passphrase if passphrase else None)
+    if ok:
+        click.secho(f"[OK] {msg}", fg="green", bold=True)
+        valid, vmsg = asyncio.run(driver.check_session_valid())
+        if valid:
+            click.secho(f"[VERIFIED] {vmsg}", fg="green")
+        else:
+            click.secho(f"[WARNING] {vmsg}", fg="yellow")
+    else:
+        click.secho(f"[ERROR] {msg}", fg="red", bold=True)
+
+@cli.command()
 def scan():
     """Jalankan screener internal Alugara untuk melihat rekomendasi emiten hari ini"""
     engine = ExecutionEngine()
@@ -108,6 +157,21 @@ def stop(port):
             click.secho(f"[STOP] Server Alugara pada port {port} berhasil dihentikan.", fg="green", bold=True)
     except Exception as e:
         click.secho(f"[ERROR] Gagal menghentikan server: {e}", fg="red")
+
+@cli.command()
+@click.option("--username", default=None, help="Username baru")
+@click.option("--password", default=None, help="Password baru")
+def reset_password(username, password):
+    """Reset Username & Password Web Dashboard Alugara"""
+    from src.core.security import set_user_credentials
+    from src.storage.db import get_setting
+    
+    current_user = get_setting("auth_username") or "admin"
+    u = username or click.prompt("Masukkan Username", default=current_user)
+    p = password or click.prompt("Masukkan Password baru", hide_input=True, confirmation_prompt=True)
+    
+    set_user_credentials(u, p)
+    click.secho(f"[OK] Kredensial Alugara berhasil di-reset untuk username: '{u}'!", fg="green", bold=True)
 
 if __name__ == "__main__":
     cli()

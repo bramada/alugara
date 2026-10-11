@@ -188,7 +188,9 @@ class ExecutionEngine:
             logger.info("Tidak ada kandidat baru yang memenuhi kriteria saat ini.")
             return
 
-        signals = await self.ai.analyze_and_rank_candidates(candidates)
+        # Ambil Top 5 kandidat teratas untuk efisiensi kuota Gemini AI
+        top_candidates = candidates[:5]
+        signals = await self.ai.analyze_and_rank_candidates(top_candidates)
         if not signals:
             logger.info("Gemini AI tidak menemukan kandidat aman saat ini.")
             return

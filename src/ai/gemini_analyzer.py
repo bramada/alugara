@@ -54,7 +54,7 @@ class GeminiAnalyzer:
     ]
 
     def __init__(self):
-        pass
+        self._key_index = 0
 
     def get_api_key(self) -> str:
         from src.core.security import decrypt_value
@@ -65,21 +65,41 @@ class GeminiAnalyzer:
                 return decrypted
         return settings.GEMINI_API_KEY or ""
 
+    def get_all_api_keys(self) -> List[str]:
+        """Mengambil seluruh Gemini API Key aktif dari database pool (beserta fallback ke single key)"""
+        from src.storage.db import get_gemini_api_keys
+        try:
+            keys_data = get_gemini_api_keys(active_only=True, decrypt=True)
+            active_keys = [k["api_key"] for k in keys_data if k.get("api_key")]
+            if active_keys:
+                return active_keys
+        except Exception as e:
+            logger.debug(f"Gagal mengambil multi-keys: {e}")
+
+        single = self.get_api_key()
+        return [single] if single else []
+
     def get_model(self) -> str:
         return get_setting("gemini_model") or settings.GEMINI_MODEL or "gemini-flash-latest"
 
     def is_enabled(self) -> bool:
         enabled_setting = get_setting("ai_reasoning_enabled", str(settings.AI_REASONING_ENABLED))
-        return enabled_setting.lower() == "true" and bool(self.get_api_key())
+        return enabled_setting.lower() == "true" and bool(self.get_all_api_keys())
 
     async def test_connection(self, api_key: Optional[str] = None, model: Optional[str] = None) -> tuple[bool, str]:
-        """Uji koneksi ke Google Gemini API dengan auto-fallback jika model spesifik sedang 503/429"""
-        key = api_key or self.get_api_key()
-        if not key:
+        """Uji koneksi ke Google Gemini API dengan auto-fallback tangguh jika model spesifik sedang 503/429/timeout"""
+        keys = [api_key] if api_key else self.get_all_api_keys()
+        if not keys:
             return False, "API Key kosong. Silakan masukkan Gemini API Key Anda."
 
+        key = keys[0]
         target_model = model or self.get_model()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{target_model}:generateContent?key={key}"
+
+        # Prioritas model: target model, lalu model super-cepat & stabil (flash-lite, 3.6-flash, flash-latest)
+        models_to_try = [target_model]
+        for fallback in ["gemini-flash-lite-latest", "gemini-3.6-flash", "gemini-flash-latest"]:
+            if fallback not in models_to_try:
+                models_to_try.append(fallback)
 
         payload = {
             "contents": [
@@ -91,74 +111,102 @@ class GeminiAnalyzer:
             ],
             "generationConfig": {
                 "temperature": 0.2,
-                "maxOutputTokens": 256,
+                "maxOutputTokens": 20,
             }
         }
 
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                res = await client.post(url, json=payload)
-                if res.status_code == 200:
-                    log_ai_usage(model=target_model, prompt_tokens=15, response_tokens=15, status_code=200, is_success=True)
-                    return True, f"Koneksi ke Google Gemini AI ({target_model}) aktif & siap melayani analisis saham!"
-                
-                # Jika model utama mengalami 503 (High Demand) atau 429 (Rate Limit), uji coba fallback
-                if res.status_code in [503, 429]:
-                    for fallback in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-flash-lite-latest"]:
-                        if fallback == target_model:
-                            continue
-                        fb_url = f"https://generativelanguage.googleapis.com/v1beta/models/{fallback}:generateContent?key={key}"
-                        fb_res = await client.post(fb_url, json=payload)
-                        if fb_res.status_code == 200:
-                            log_ai_usage(model=fallback, prompt_tokens=15, response_tokens=15, status_code=200, is_success=True)
-                            return True, f"API Key Valid! Model '{target_model}' sedang lonjakan trafik ({res.status_code}). Sistem otomatis mem-fallback ke '{fallback}' sehingga trading tetap aman."
-                
-                err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
-                err_msg = err_json.get("error", {}).get("message", res.text)
-                return False, f"Google Gemini Error ({res.status_code}): {err_msg}"
-        except Exception as e:
-            return False, f"Gagal menghubungi server Gemini: {e}"
+        last_err = ""
+        for m in models_to_try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
+            try:
+                async with httpx.AsyncClient(timeout=6.0) as client:
+                    res = await client.post(url, json=payload)
+                    if res.status_code == 200:
+                        log_ai_usage(model=m, prompt_tokens=15, response_tokens=15, status_code=200, is_success=True)
+                        if m == target_model:
+                            return True, f"Koneksi ke Google Gemini AI ({m}) aktif & siap melayani analisis saham!"
+                        else:
+                            return True, f"API Key Valid! Model '{target_model}' sedang antre/timeout di Google, otomatis fallback ke '{m}'."
+
+                    err_json = res.json() if "application/json" in res.headers.get("content-type", "") else {}
+                    err_msg = err_json.get("error", {}).get("message", res.text)
+                    
+                    # Jika API Key memang salah menurut Google, jangan fallback
+                    if res.status_code in [400, 403] and ("API_KEY_INVALID" in err_msg or "not valid" in err_msg.lower()):
+                        return False, f"API Key tidak valid (Ditolak Google): {err_msg}"
+                    
+                    last_err = f"Model {m} status {res.status_code}: {err_msg}"
+            except Exception as e:
+                err_detail = str(e) or type(e).__name__
+                last_err = f"Model {m} ({err_detail})"
+
+        return False, f"Gagal menghubungi server Gemini: {last_err}"
 
     async def call_gemini(self, prompt: str, api_key: Optional[str] = None, model: Optional[str] = None) -> Optional[str]:
-        key = api_key or self.get_api_key()
-        if not key:
+        """
+        Memanggil Gemini API dengan fitur:
+        1. Multi-API Key Round-Robin & Failover otomatis saat kuota limit (429/403/503)
+        2. Multi-Model Fallback jika model tertentu sedang lonjakan trafik
+        3. Token output yang hemat & efisien (maxOutputTokens: 512)
+        """
+        from src.storage.db import record_gemini_key_usage
+
+        keys = [api_key] if api_key else self.get_all_api_keys()
+        if not keys:
             return None
 
         target_model = model or self.get_model()
         
-        # Bangun urutan model fallback
+        # Bangun urutan model fallback: Utamakan model super-cepat & stabil
         models_to_try = [target_model]
-        for fb in ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3.6-flash", "gemini-flash-lite-latest"]:
+        for fb in ["gemini-flash-lite-latest", "gemini-3.6-flash", "gemini-flash-latest"]:
             if fb not in models_to_try:
                 models_to_try.append(fb)
 
-        for m in models_to_try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={key}"
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}],
-                "generationConfig": {
-                    "temperature": 0.2,
-                    "maxOutputTokens": 2048,
-                }
-            }
-            try:
-                async with httpx.AsyncClient(timeout=25.0) as client:
-                    res = await client.post(url, json=payload)
-                    usage_meta = res.json().get("usageMetadata", {}) if res.status_code == 200 else {}
-                    p_tok = usage_meta.get("promptTokenCount", 0)
-                    r_tok = usage_meta.get("candidatesTokenCount", 0)
-                    log_ai_usage(model=m, prompt_tokens=p_tok, response_tokens=r_tok, status_code=res.status_code, is_success=(res.status_code == 200))
+        # Rotasi Round-Robin antar API Key yang tersedia
+        num_keys = len(keys)
+        start_idx = self._key_index % num_keys
+        self._key_index = (self._key_index + 1) % num_keys
+        ordered_keys = [keys[(start_idx + i) % num_keys] for i in range(num_keys)]
 
-                    if res.status_code == 200:
-                        data = res.json()
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                    else:
-                        logger.warning(f"Gemini API ({m}) status {res.status_code}, mencoba fallback model berikutnya...")
-            except Exception as e:
-                log_ai_usage(model=m, status_code=500, is_success=False)
-                logger.warning(f"Gemini API ({m}) exception: {e}")
+        for current_key in ordered_keys:
+            masked_key = (current_key[:8] + "..." + current_key[-4:]) if len(current_key) > 12 else "KEY"
+            for m in models_to_try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={current_key}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 512,  # Irit kuota & respon cepat
+                    }
+                }
+                try:
+                    # Timeout 6.0 detik: jika model sedang lag di Google, cepat beralih ke model fallback
+                    async with httpx.AsyncClient(timeout=6.0) as client:
+                        res = await client.post(url, json=payload)
+                        usage_meta = res.json().get("usageMetadata", {}) if res.status_code == 200 else {}
+                        p_tok = usage_meta.get("promptTokenCount", 0)
+                        r_tok = usage_meta.get("candidatesTokenCount", 0)
+                        log_ai_usage(model=m, prompt_tokens=p_tok, response_tokens=r_tok, status_code=res.status_code, is_success=(res.status_code == 200))
+
+                        if res.status_code == 200:
+                            record_gemini_key_usage(current_key, is_success=True)
+                            data = res.json()
+                            candidates = data.get("candidates", [])
+                            if candidates:
+                                return candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        elif res.status_code in [429, 403]:
+                            logger.warning(f"Gemini API ({m}) limit/error ({res.status_code}) pada key ({masked_key}). Mencoba model berikutnya...")
+                        elif res.status_code == 503:
+                            logger.warning(f"Gemini API ({m}) overload (503). Mencoba model fallback berikutnya...")
+                        else:
+                            logger.warning(f"Gemini API ({m}) status {res.status_code}, mencoba fallback model berikutnya...")
+                except Exception as e:
+                    err_name = type(e).__name__
+                    log_ai_usage(model=m, status_code=500, is_success=False)
+                    logger.warning(f"Gemini API ({m}) {err_name}, mencoba model fallback berikutnya...")
+
+            record_gemini_key_usage(current_key, is_success=False)
 
         return None
 
@@ -332,48 +380,46 @@ PETUNJUK JAWABAN:
     async def analyze_and_rank_candidates(self, candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         FASE 1 (Pre-Trade AI Gatekeeper):
-        Menganalisis daftar kandidat saham, menyaring jebakan bandar,
-        memberi skor keyakinan AI (1-100), dan memilih saham-saham yang benar-benar layak.
+        Menganalisis Top 5 kandidat saham, menyaring jebakan bandar,
+        memberi skor keyakinan AI (1-100), dan memilih saham yang benar-benar layak.
+        Prompt dioptimasi super irit token.
         """
         if not candidates:
             return []
+
+        # Batasi tegas hanya TOP 5 kandidat untuk efisiensi kuota API
+        candidates = candidates[:5]
 
         if not self.is_enabled():
             logger.info("Gemini AI reasoning nonaktif/tanpa API Key. Menggunakan ranking kuantitatif standar.")
             return candidates
 
-        # 1. Ambil Buku Pintar Memori Masa Lalu (RAG Memory Context)
-        past_memories = get_top_ai_memories(limit=10)
+        # 1. Ambil 3 Memori Terpenting Saja (Hemat Token RAG)
+        past_memories = get_top_ai_memories(limit=3)
         memory_context = ""
         if past_memories:
-            memory_context = "BUKU PINTAR PENGALAMAN & ATURAN TRADE (RAG MEMORY):\n"
-            for m in past_memories:
-                memory_context += f"- [Pola #{m['ticker']} ({m['strategy_name']})]: {m['lesson_learned']}\n"
+            memory_context = "BUKU PINTAR ATURAN:\n" + "\n".join([f"- #{m['ticker']}: {m['lesson_learned']}" for m in past_memories])
 
-        prompt = f"""
-Anda adalah Senior Quantitative Trader & Chief Risk Officer di Bursa Efek Indonesia (IDX) untuk sistem Auto-Trading Alugara.
+        # Minifikasi data kandidat (hanya atribut esensial, tanpa whitespace berlebih)
+        compact_candidates = [
+            {
+                "ticker": c.get("ticker"),
+                "price": c.get("current_price") or c.get("price"),
+                "change_pct": round(c.get("change_percent", 0), 2)
+            }
+            for c in candidates
+        ]
 
-FILOSOFI UTAMA TRADING:
-"Cuan berapa persen pun asal tidak lose. Modal aman dan untung konsisten."
-
-Tugas Anda:
-Analisis secara real-time kandidat saham yang terdeteksi aktif di jam bursa ini.
-Saring dan rekomendasikan saham-saham yang BENAR-BENAR AMAN, memiliki konfirmasi akumulasi buyer kuat, dan berprobabilitas tinggi untuk memberikan keuntungan (+1.5% s/d +3.5%) dengan risiko sekecil mungkin.
-
-PRINSIP SELEKSI:
-1. Bebas menentukan jumlah saham yang layak (bisa 1, 2, 4, atau berapapun), JANGAN membatasi kuota secara kaku.
-2. Hindari saham yang rentan guyuran bandar (fake bid, distribusi terselubung, pom-pom).
-3. Hanya rekomendasikan jika Anda yakin saham ini aman dan berpotensi naik (ai_score >= 75).
-4. Berikan 'ai_score' (1-100), 'strategy_name', dan 'ai_reasoning' singkat (1-2 kalimat).
-5. Patuhi semua aturan di Buku Pintar Pengalaman.
-6. Urutkan dari ai_score tertinggi ke terendah.
+        prompt = f"""Sebagai Chief Risk Officer IDX Alugara Auto-Trade, evaluasi Top {len(compact_candidates)} kandidat saham berikut.
+Filosofi: Cuan aman (+1.5% s/d +3.5%), anti-jebakan bandar (fake bid/pom-pom).
+Hanya pilih yang benar-benar layak (ai_score >= 75).
 
 {memory_context}
 
-DAFTAR KANDIDAT SAHAM HARI INI:
-{json.dumps(candidates, indent=2)}
+KANDIDAT:
+{json.dumps(compact_candidates)}
 
-Kembalikan HANYA format JSON murni array of objects tanpa markdown:
+KEMBALIKAN HANYA format JSON murni array of objects:
 [
   {{
     "ticker": "BBCA",
@@ -382,13 +428,12 @@ Kembalikan HANYA format JSON murni array of objects tanpa markdown:
     "target_price_1": 10150,
     "target_price_2": 10350,
     "stop_loss_price": 9600,
-    "strategy_name": "BSJP 1 - Breakout Momentum",
-    "ai_score": 92,
-    "ai_reasoning": "Akumulasi volume solid di 15 menit penutupan, tidak ada tanda guyuran bandar."
+    "strategy_name": "Momentum Breakout",
+    "ai_score": 85,
+    "ai_reasoning": "Akumulasi buyer solid tanpa tekanan guyuran."
   }}
-]
-"""
-        logger.info("Mengirim data kandidat saham ke Gemini AI untuk analisis mendalam...")
+]"""
+        logger.info("Mengirim data Top 5 kandidat saham ke Gemini AI (Prompt Ringkas & Irit Token)...")
         raw_response = await self.call_gemini(prompt)
 
         if raw_response:

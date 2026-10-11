@@ -168,3 +168,95 @@ async def require_auth(request: Request) -> str:
             detail="Sesi tidak valid atau telah kedaluwarsa. Silakan login kembali."
         )
     return token
+
+def create_session_export_package(raw_json_str: str, passphrase: Optional[str] = None) -> dict:
+    """
+    Membungkus session state JSON ke dalam paket terenkripsi AES-256 Fernet.
+    Jika passphrase diisi, menggunakan key PBKDF2HMAC (100.000 iterasi) + salt acak.
+    Jika passphrase kosong, menggunakan _get_fernet() master key lokal.
+    """
+    import base64
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+
+    clean_pwd = passphrase.strip() if passphrase and passphrase.strip() else None
+    if clean_pwd:
+        salt = os.urandom(16)
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        derived_key = base64.urlsafe_b64encode(kdf.derive(clean_pwd.encode('utf-8')))
+        f = Fernet(derived_key)
+        encrypted_payload = f.encrypt(raw_json_str.encode('utf-8')).decode('utf-8')
+        return {
+            "app": "alugara",
+            "type": "stockbit_session",
+            "version": "1.0",
+            "kdf": "pbkdf2_sha256",
+            "salt": base64.b64encode(salt).decode('utf-8'),
+            "payload": encrypted_payload,
+            "exported_at": datetime.now(timezone.utc).isoformat()
+        }
+    else:
+        f = _get_fernet()
+        encrypted_payload = f.encrypt(raw_json_str.encode('utf-8')).decode('utf-8')
+        return {
+            "app": "alugara",
+            "type": "stockbit_session",
+            "version": "1.0",
+            "kdf": "system_secret",
+            "payload": encrypted_payload,
+            "exported_at": datetime.now(timezone.utc).isoformat()
+        }
+
+def decrypt_session_export_package(package: dict, passphrase: Optional[str] = None) -> str:
+    """
+    Mendekripsi paket sesi terenkripsi kembali ke format JSON raw Playwright session.
+    """
+    import base64
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from cryptography.hazmat.primitives import hashes
+
+    if not isinstance(package, dict) or package.get("app") != "alugara" or package.get("type") != "stockbit_session":
+        raise ValueError("Format file tidak valid. Bukan paket sesi Alugara resmi.")
+
+    payload = package.get("payload")
+    if not payload:
+        raise ValueError("Payload sesi dalam file kosong.")
+
+    kdf = package.get("kdf")
+    clean_pwd = passphrase.strip() if passphrase and passphrase.strip() else None
+
+    if kdf == "pbkdf2_sha256":
+        if not clean_pwd:
+            raise ValueError("File sesi ini diproteksi passphrase. Silakan masukkan passphrase saat impor.")
+        salt_b64 = package.get("salt")
+        if not salt_b64:
+            raise ValueError("Parameter salt kriptografi pada paket tidak ditemukan.")
+        salt = base64.b64decode(salt_b64)
+        kdf_inst = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        derived_key = base64.urlsafe_b64encode(kdf_inst.derive(clean_pwd.encode('utf-8')))
+        try:
+            f = Fernet(derived_key)
+            return f.decrypt(payload.encode('utf-8')).decode('utf-8')
+        except Exception:
+            raise ValueError("Gagal mendekripsi file sesi. Passphrase yang dimasukkan salah!")
+
+    elif kdf == "system_secret":
+        try:
+            f = _get_fernet()
+            return f.decrypt(payload.encode('utf-8')).decode('utf-8')
+        except Exception:
+            raise ValueError("Kunci rahasia master berbeda dengan mesin asal. Jika mengekspor dari perangkat lain, disarankan gunakan passphrase saat ekspor.")
+
+    else:
+        raise ValueError(f"Algoritma enkripsi paket '{kdf}' tidak dikenali.")
+

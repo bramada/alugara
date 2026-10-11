@@ -902,99 +902,163 @@
             <p class="text-xs text-slate-400 mt-1">Seluruh konfigurasi tersimpan aman di database internal.</p>
           </div>
 
-          <!-- Section 1: Gemini AI Key -->
-          <div class="p-4 rounded-2xl bg-gradient-to-r from-purple-900/30 via-slate-900/80 to-slate-900/80 border border-purple-500/30 space-y-4">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-bold text-purple-300 flex items-center gap-1.5">
-                <span>🧠 Google Gemini AI API Configuration</span>
-              </h3>
+          <!-- Section 1: Gemini AI Multi-Key Pool & Configuration -->
+          <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-purple-900/30 via-slate-900/80 to-slate-900/80 border border-purple-500/30 space-y-4">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <h3 class="text-sm font-bold text-purple-300 flex items-center gap-1.5">
+                  <span>🧠 Google Gemini AI — Multi-Key Pool & Model</span>
+                </h3>
+                <p class="text-[11px] text-slate-400 mt-0.5">Sistem otomatis merotasi (Round-Robin) & beralih instan (Failover) saat kuota limit.</p>
+              </div>
               <label class="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 border border-purple-500/25 hover:border-purple-500/40 text-xs font-semibold text-purple-200 cursor-pointer select-none transition-all active:scale-95 group">
                 <input type="checkbox" x-model="formSettings.ai_reasoning_enabled" class="accent-purple">
                 <span class="group-hover:text-purple-100 transition-colors">Aktifkan AI Reasoning</span>
               </label>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Gemini API Key</label>
-                <div class="relative">
-                  <input :type="showSecret.gemini_api_key ? 'text' : 'password'" x-model="formSettings.gemini_api_key" placeholder="Masukkan Gemini API Key (AIzaSy...)"
-                         autocomplete="off" autocorrect="off" spellcheck="false" data-lpignore="true"
-                         class="w-full px-4 py-2.5 rounded-2xl bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:border-purple-400 font-mono pr-11">
-                  <button type="button" @click="showSecret.gemini_api_key = !showSecret.gemini_api_key"
-                          class="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                          :title="showSecret.gemini_api_key ? 'Sembunyikan' : 'Lihat'">
-                    <svg x-show="!showSecret.gemini_api_key" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                    <svg x-show="showSecret.gemini_api_key" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
-                    </svg>
-                  </button>
+            <!-- Custom Premium Model Dropdown (Google Gemini Official) -->
+            <div class="relative" @click.outside="modelDropdownOpen = false">
+              <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI (Google Gemini Official)</label>
+              
+              <button type="button" @click="modelDropdownOpen = !modelDropdownOpen"
+                      class="w-full px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-purple-500/60 text-white text-sm flex items-center justify-between transition-all focus:outline-none">
+                <div class="flex items-center gap-2 truncate pr-2">
+                  <span class="font-bold text-white text-xs sm:text-sm" x-text="getSelectedModel().name"></span>
+                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider"
+                        :class="getSelectedModel().badgeClass" x-text="getSelectedModel().badge"></span>
                 </div>
-              </div>
+                <svg class="w-4 h-4 shrink-0 transition-transform duration-200 text-slate-400"
+                     :class="modelDropdownOpen ? 'rotate-180 text-purple-400' : ''"
+                     fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-              <!-- Custom Premium Model Dropdown (Google Gemini Official) -->
-              <div class="relative" @click.outside="modelDropdownOpen = false">
-                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilihan Model AI (Google Gemini Official)</label>
-                
-                <!-- Dropdown Trigger Button -->
-                <button type="button" @click="modelDropdownOpen = !modelDropdownOpen"
-                        class="w-full px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-purple-500/60 text-white text-sm flex items-center justify-between transition-all focus:outline-none">
-                  <div class="flex items-center gap-2 truncate pr-2">
-                    <span class="font-bold text-white text-xs sm:text-sm" x-text="getSelectedModel().name"></span>
-                    <span class="px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wider"
-                          :class="getSelectedModel().badgeClass" x-text="getSelectedModel().badge"></span>
-                  </div>
-                  <svg class="w-4 h-4 shrink-0 transition-transform duration-200 text-slate-400"
-                       :class="modelDropdownOpen ? 'rotate-180 text-purple-400' : ''"
-                       fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                <!-- Floating Menu -->
-                <div x-show="modelDropdownOpen" x-transition:enter="transition ease-out duration-150"
-                     x-transition:enter-start="opacity-0 translate-y-1 scale-98"
-                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
-                     x-transition:leave="transition ease-in duration-100"
-                     x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                     x-transition:leave-end="opacity-0 translate-y-1 scale-98"
-                     class="absolute left-0 right-0 z-50 mt-2 bg-slate-900/95 border border-purple-500/40 rounded-2xl shadow-2xl p-2 max-h-80 overflow-y-auto custom-scroll pr-1.5 backdrop-blur-2xl space-y-1 divide-y divide-slate-800/60">
-                  <template x-for="m in geminiModels" :key="m.id">
-                    <div @click="formSettings.gemini_model = m.id; modelDropdownOpen = false"
-                         :class="formSettings.gemini_model === m.id ? 'bg-purple-600/20 border-purple-500/40 text-purple-200' : 'hover:bg-slate-800/80 text-slate-300 hover:text-white border-transparent'"
-                         class="p-2.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-2">
-                      <div class="space-y-0.5 flex-1 min-w-0">
-                        <div class="flex items-center gap-2">
-                          <span class="font-bold text-xs sm:text-sm text-white" x-text="m.name"></span>
-                          <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider"
-                                :class="m.badgeClass" x-text="m.badge"></span>
-                        </div>
-                        <p class="text-[11px] text-slate-400 line-clamp-1" x-text="m.desc"></p>
+              <!-- Floating Menu -->
+              <div x-show="modelDropdownOpen" x-transition:enter="transition ease-out duration-150"
+                   x-transition:enter-start="opacity-0 translate-y-1 scale-98"
+                   x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                   x-transition:leave="transition ease-in duration-100"
+                   x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                   x-transition:leave-end="opacity-0 translate-y-1 scale-98"
+                   class="absolute left-0 right-0 z-50 mt-2 bg-slate-900/95 border border-purple-500/40 rounded-2xl shadow-2xl p-2 max-h-80 overflow-y-auto custom-scroll pr-1.5 backdrop-blur-2xl space-y-1 divide-y divide-slate-800/60">
+                <template x-for="m in geminiModels" :key="m.id">
+                  <div @click="formSettings.gemini_model = m.id; modelDropdownOpen = false"
+                       :class="formSettings.gemini_model === m.id ? 'bg-purple-600/20 border-purple-500/40 text-purple-200' : 'hover:bg-slate-800/80 text-slate-300 hover:text-white border-transparent'"
+                       class="p-2.5 rounded-xl border cursor-pointer transition-all flex items-start justify-between gap-2">
+                    <div class="space-y-0.5 flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-xs sm:text-sm text-white" x-text="m.name"></span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider"
+                              :class="m.badgeClass" x-text="m.badge"></span>
                       </div>
-                      <div x-show="formSettings.gemini_model === m.id" class="text-purple-400 pt-0.5 shrink-0">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
+                      <p class="text-[11px] text-slate-400 line-clamp-1" x-text="m.desc"></p>
                     </div>
-                  </template>
-                </div>
+                    <div x-show="formSettings.gemini_model === m.id" class="text-purple-400 pt-0.5 shrink-0">
+                      <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  </div>
+                </template>
               </div>
             </div>
 
-            <div>
-              <button @click="testGemini()" class="px-4 py-2.5 rounded-xl bg-purple-600/30 hover:bg-purple-600/50 border border-purple-500/40 text-purple-200 text-xs font-bold transition-all flex items-center gap-2">
-                <span>⚡ Uji Coba Koneksi Gemini AI</span>
-              </button>
+            <!-- Dynamic Multi-Key Pool Table / List -->
+            <div class="pt-3 border-t border-purple-500/20 space-y-3">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-purple-200 flex items-center gap-1.5">
+                  <span>🔑 Kolam API Key Aktif (Multi-Key Pool)</span>
+                  <span class="px-2 py-0.5 text-[10px] rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30" x-text="`${geminiKeys.length} Key Terdaftar`"></span>
+                </span>
+                <span class="text-[11px] text-slate-400 hidden sm:inline">Rotasi Otomatis & Kuota Terakumulasi</span>
+              </div>
+
+              <!-- List of configured keys -->
+              <div class="space-y-2">
+                <template x-for="k in geminiKeys" :key="k.id">
+                  <div class="p-3 rounded-xl bg-slate-800/80 border border-slate-700/80 flex items-center justify-between gap-3 flex-wrap sm:flex-nowrap">
+                    <div class="flex items-center gap-3 min-w-0">
+                      <button type="button" @click="toggleGeminiKey(k.id)"
+                              class="px-2 py-1 rounded-lg flex items-center justify-center shrink-0 transition-colors text-[10px] font-bold"
+                              :class="k.is_active ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'bg-slate-700/50 border border-slate-600 text-slate-400'"
+                              :title="k.is_active ? 'Status: Aktif. Klik untuk nonaktifkan' : 'Status: Nonaktif. Klik untuk aktifkan'">
+                        <span x-text="k.is_active ? 'ON' : 'OFF'"></span>
+                      </button>
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="text-xs font-bold text-white truncate" x-text="k.label"></span>
+                          <span x-show="k.error_count > 0" class="px-1.5 py-0.5 rounded text-[9px] bg-rose-500/20 text-rose-300 border border-rose-500/30" x-text="`Pernah Limit (${k.error_count}x)`"></span>
+                        </div>
+                        <span class="font-mono text-[11px] text-slate-400 block truncate" x-text="k.key_masked"></span>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                      <button type="button" @click="testGeminiKey(k.id)"
+                              class="px-2.5 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 text-purple-200 hover:text-white text-[11px] font-semibold transition-all flex items-center gap-1"
+                              title="Uji coba koneksi key ini">
+                        <span>⚡ Test</span>
+                      </button>
+                      <button type="button" @click="deleteGeminiKey(k.id)"
+                              class="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/20 text-rose-400 hover:text-rose-200 transition-colors"
+                              title="Hapus API Key ini">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+
+                <div x-show="geminiKeys.length === 0" class="p-3 text-center text-xs text-slate-400 bg-slate-800/40 rounded-xl border border-dashed border-slate-700">
+                  Belum ada API Key di pool. Tambahkan setidaknya 1 API Key di bawah ini.
+                </div>
+              </div>
+
+              <!-- Form Add Key Dynamically -->
+              <div class="p-3 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-2.5">
+                <span class="text-xs font-semibold text-purple-300 flex items-center gap-1">
+                  <span>➕ Tambah Gemini API Key Baru</span>
+                </span>
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                  <div class="sm:col-span-4">
+                    <input type="text" x-model="newGeminiKey.label" placeholder="Label (cth: Akun Google 2)"
+                           class="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-purple-400">
+                  </div>
+                  <div class="sm:col-span-6">
+                    <input type="password" x-model="newGeminiKey.key" placeholder="Masukkan Gemini API Key (AIzaSy...)"
+                           class="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-purple-400 font-mono">
+                  </div>
+                  <div class="sm:col-span-2">
+                    <button type="button" @click="addGeminiKey()" :disabled="addingKey"
+                            class="w-full h-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white text-xs font-bold transition-all flex items-center justify-center gap-1">
+                      <span x-text="addingKey ? 'Memverifikasi...' : '+ Simpan'"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 
           <!-- Section 2: Stockbit PIN & Login -->
           <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-4">
-            <h3 class="text-sm font-bold text-cyan-400">Akun & Keamanan Stockbit</h3>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <h3 class="text-sm font-bold text-cyan-400">Akun & Keamanan Stockbit</h3>
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold border"
+                      :class="status.session?.is_authenticated ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-slate-800 text-slate-400 border-slate-700'">
+                  <span class="w-1.5 h-1.5 rounded-full" :class="status.session?.is_authenticated ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'"></span>
+                  <span x-text="status.session?.is_authenticated ? 'Sesi Aktif' : 'Belum Login / Kedaluwarsa'"></span>
+                </span>
+                <button type="button" @click="checkSessionNow()" class="text-xs text-slate-400 hover:text-cyan-400 p-1 transition-colors" title="Cek Status Sesi Sekarang">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
+            </div>
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -1018,9 +1082,29 @@
               </div>
 
               <div>
-                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pairing Login Sesi</label>
-                <button @click="triggerBrowserLogin()" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2">
-                  <span>🔑 Hubungkan / Login Stockbit</span>
+                <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pairing Browser (Komputer Lokal)</label>
+                <button type="button" @click="triggerBrowserLogin()" class="w-full py-2.5 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2">
+                  <span>🔑 Buka Browser Chrome Login</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Transfer & Backup Sesi Antar Server (Export/Import) -->
+            <div class="pt-3 border-t border-slate-800/80">
+              <div class="flex items-center justify-between mb-2">
+                <div>
+                  <span class="text-xs font-semibold text-slate-300">Sinkronisasi & Backup Sesi (VPS Linux / Multi-Device)</span>
+                  <p class="text-[11px] text-slate-400">Ekspor sesi dari laptop ke file terenkripsi (.alugara), lalu impor di VPS tanpa butuh browser GUI.</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                <button type="button" @click="openExportSessionModal()"
+                        class="py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 hover:border-cyan-500/50 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
+                  <span>📤 Ekspor Sesi (.alugara)</span>
+                </button>
+                <button type="button" @click="openImportSessionModal()"
+                        class="py-2.5 px-4 rounded-2xl bg-slate-800 hover:bg-slate-700/80 border border-slate-700 hover:border-emerald-500/50 text-emerald-300 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
+                  <span>📥 Impor Sesi (.alugara)</span>
                 </button>
               </div>
             </div>
@@ -1346,6 +1430,116 @@
     </div>
   </div>
 
+  <!-- ============================================================== -->
+  <!-- 3. EXPORT SESSION MODAL (Z-INDEX 9998)                         -->
+  <!-- ============================================================== -->
+  <div x-show="exportSessionModal.open"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-[#070b14]/85 backdrop-blur-md"
+       x-cloak>
+    <div @click.away="exportSessionModal.open = false"
+         class="relative max-w-md w-full bg-[#0d1527] border border-cyan-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden shadow-cyan-950/50">
+      
+      <!-- Glow decoration -->
+      <div class="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-40 bg-cyan-500"></div>
+
+      <div class="flex items-center gap-3.5 mb-4">
+        <div class="w-11 h-11 rounded-2xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-xl flex-shrink-0">
+          📤
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white tracking-tight">Ekspor Sesi Stockbit</h3>
+          <p class="text-xs text-slate-400">Enkripsi AES-256 untuk pemindahan ke server</p>
+        </div>
+      </div>
+
+      <div class="space-y-3.5 my-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Passphrase / PIN Pengaman (Opsional)</label>
+          <input type="password" x-model="exportSessionModal.passphrase" placeholder="Contoh: PIN atau password rahasia"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-cyan-400 font-mono">
+          <p class="text-[11px] text-slate-400 mt-1.5 leading-normal">
+            💡 Direkomendasikan jika ingin dipindahkan ke server VPS Linux lain. Masukkan passphrase yang sama saat mengimpor di server tujuan.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" @click="exportSessionModal.open = false"
+                class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all">
+          Batal
+        </button>
+        <button type="button" @click="doExportSession()" :disabled="exportSessionModal.loading"
+                class="px-5 py-2.5 rounded-xl text-white text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 shadow-lg shadow-cyan-500/25 flex items-center gap-2 transition-all">
+          <span x-show="exportSessionModal.loading" class="animate-spin text-xs">⏳</span>
+          <span>Unduh Paket Sesi (.alugara)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================== -->
+  <!-- 4. IMPORT SESSION MODAL (Z-INDEX 9998)                         -->
+  <!-- ============================================================== -->
+  <div x-show="importSessionModal.open"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0"
+       x-transition:enter-end="opacity-100"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100"
+       x-transition:leave-end="opacity-0"
+       class="fixed inset-0 z-[9998] flex items-center justify-center p-4 bg-[#070b14]/85 backdrop-blur-md"
+       x-cloak>
+    <div @click.away="importSessionModal.open = false"
+         class="relative max-w-md w-full bg-[#0d1527] border border-emerald-500/30 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden shadow-emerald-950/50">
+      
+      <!-- Glow decoration -->
+      <div class="absolute -top-16 -right-16 w-36 h-36 rounded-full blur-2xl pointer-events-none opacity-40 bg-emerald-500"></div>
+
+      <div class="flex items-center gap-3.5 mb-4">
+        <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-xl flex-shrink-0">
+          📥
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white tracking-tight">Impor Sesi Stockbit</h3>
+          <p class="text-xs text-slate-400">Pulihkan sesi dari file terenkripsi (.alugara)</p>
+        </div>
+      </div>
+
+      <div class="space-y-3.5 my-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Pilih File Paket Sesi (.alugara / .json)</label>
+          <input type="file" id="sessionFileInput" accept=".alugara,.json" @change="onSessionFileSelected($event)"
+                 class="w-full text-xs text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-slate-800 file:text-emerald-300 hover:file:bg-slate-700 cursor-pointer">
+          <div x-show="importSessionModal.filename" class="mt-1 text-[11px] text-emerald-400 font-mono" x-text="'File terpilih: ' + importSessionModal.filename"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Passphrase / PIN Pengaman (Jika Ada)</label>
+          <input type="password" x-model="importSessionModal.passphrase" placeholder="Masukkan passphrase saat ekspor (jika ada)"
+                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-white text-xs focus:outline-none focus:border-emerald-400 font-mono">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button type="button" @click="importSessionModal.open = false"
+                class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all">
+          Batal
+        </button>
+        <button type="button" @click="doImportSession()" :disabled="importSessionModal.loading || !importSessionModal.content"
+                class="px-5 py-2.5 rounded-xl text-white text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 shadow-lg shadow-emerald-500/25 flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <span x-show="importSessionModal.loading" class="animate-spin text-xs">⏳</span>
+          <span>Dekripsi & Pasang Sesi</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- ALPINE JS LOGIC -->
   <script>
     function alugaraApp() {
@@ -1372,18 +1566,25 @@
         modelDropdownOpen: false,
         geminiModels: [
             {
-              id: 'gemini-flash-latest',
-              name: 'Gemini Flash Latest',
-              badge: 'Stabil & Cepat',
+              id: 'gemini-flash-lite-latest',
+              name: 'Gemini Flash-Lite Latest',
+              badge: '⚡ Tercepat (<2s)',
               badgeClass: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
-              desc: 'Model flagship resmi tercepat & paling stabil untuk eksekusi live saham IDX'
+              desc: 'Respon instan < 2 detik, super ringan, hemat kuota token & anti-lag'
             },
             {
-              id: 'gemini-3.8-flash',
-              name: 'Gemini 3.8 Flash',
-              badge: 'Next-Gen Ultra',
+              id: 'gemini-3.6-flash',
+              name: 'Gemini 3.6 Flash',
+              badge: 'Stabil & Cepat',
+              badgeClass: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
+              desc: 'Respon cepat ~2 detik, sangat stabil untuk evaluasi pasar'
+            },
+            {
+              id: 'gemini-flash-latest',
+              name: 'Gemini Flash Latest',
+              badge: 'Standar Google',
               badgeClass: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
-              desc: 'Throughput ultra tinggi dan respons instan pemindaian sinyal pasar'
+              desc: 'Model flagship standar resmi Google AI Studio'
             },
             {
               id: 'gemini-3.7-flash',
@@ -1393,18 +1594,11 @@
               desc: 'Penalaran mendalam untuk mendeteksi jebakan fake bid / distribusi bandar'
             },
             {
-              id: 'gemini-3.6-flash',
-              name: 'Gemini 3.6 Flash',
-              badge: 'Agentic Mode',
-              badgeClass: 'bg-teal-500/20 text-teal-300 border border-teal-500/30',
-              desc: 'Dioptimalkan untuk eksekusi multi-faktor dan pengambilan keputusan agen'
-            },
-            {
-              id: 'gemini-flash-lite-latest',
-              name: 'Gemini Flash-Lite Latest',
-              badge: 'Hemat Kuota',
+              id: 'gemini-3.8-flash',
+              name: 'Gemini 3.8 Flash',
+              badge: 'Next-Gen Ultra',
               badgeClass: 'bg-purple-500/20 text-purple-300 border border-purple-500/30',
-              desc: 'Super ringan, hemat kuota token dan bebas limit bottleneck'
+              desc: 'Throughput ultra tinggi pemindaian sinyal pasar'
             },
             {
               id: 'gemini-pro-latest',
@@ -1467,6 +1661,19 @@
           resolve: () => {}
         },
 
+        exportSessionModal: {
+          open: false,
+          passphrase: '',
+          loading: false
+        },
+        importSessionModal: {
+          open: false,
+          passphrase: '',
+          filename: '',
+          content: null,
+          loading: false
+        },
+
         showSecret: {
           gemini_api_key: false,
           trading_pin: false,
@@ -1487,6 +1694,10 @@
           telegram_bot_token: '',
           telegram_chat_id: '',
         },
+
+        geminiKeys: [],
+        newGeminiKey: { key: '', label: '' },
+        addingKey: false,
 
         notify(message, type = 'info', title = null, duration = 4500) {
           if (!title) {
@@ -1758,6 +1969,9 @@
             const data = await res.json();
             if (data.success) {
               this.status = data;
+              if (data.gemini_keys) {
+                this.geminiKeys = data.gemini_keys;
+              }
               // Hanya isi formSettings saat inisialisasi awal agar ketikan user tidak hilang tertimpa
               if (!this.settingsLoaded && data.settings) {
                 this.formSettings.capital_per_strategy = data.settings.capital_per_strategy || 9000000;
@@ -1842,6 +2056,105 @@
           }
         },
 
+        async fetchGeminiKeys() {
+          try {
+            const res = await fetch('/api/v1/gui/gemini-keys');
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              this.geminiKeys = data.keys || [];
+            }
+          } catch (e) {
+            console.error('Gagal mengambil daftar Gemini keys:', e);
+          }
+        },
+
+        async addGeminiKey() {
+          if (!this.newGeminiKey.key || !this.newGeminiKey.key.trim()) {
+            this.notify('Silakan masukkan API Key Gemini.', 'warning', 'API Key Kosong');
+            return;
+          }
+          this.addingKey = true;
+          try {
+            const res = await fetch('/api/v1/gui/gemini-keys', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                api_key: this.newGeminiKey.key.trim(),
+                label: this.newGeminiKey.label ? this.newGeminiKey.label.trim() : ''
+              })
+            });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              this.notify(data.message, 'success', 'Key Berhasil Ditambahkan');
+              this.newGeminiKey = { key: '', label: '' };
+              await this.fetchGeminiKeys();
+            } else {
+              this.notify(data.message, 'error', 'Gagal Menambah Key');
+            }
+          } catch (e) {
+            this.notify('Error: ' + e, 'error', 'Koneksi Gagal');
+          } finally {
+            this.addingKey = false;
+          }
+        },
+
+        async deleteGeminiKey(id) {
+          const ok = await this.confirmDialog({
+            title: 'Hapus API Key',
+            message: 'Yakin ingin menghapus API Key ini dari pool Alugara?',
+            confirmText: 'Hapus Key',
+            cancelText: 'Batal',
+            type: 'rose'
+          });
+          if (!ok) return;
+
+          try {
+            const res = await fetch(`/api/v1/gui/gemini-keys/${id}`, { method: 'DELETE' });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              this.notify(data.message, 'success', 'Key Dihapus');
+              await this.fetchGeminiKeys();
+            } else {
+              this.notify(data.message, 'error', 'Gagal Menghapus');
+            }
+          } catch (e) {
+            this.notify('Error: ' + e, 'error', 'Hapus Gagal');
+          }
+        },
+
+        async toggleGeminiKey(id) {
+          try {
+            const res = await fetch(`/api/v1/gui/gemini-keys/${id}/toggle`, { method: 'PATCH' });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              await this.fetchGeminiKeys();
+            }
+          } catch (e) {
+            console.error('Toggle error:', e);
+          }
+        },
+
+        async testGeminiKey(id) {
+          try {
+            this.notify('Menguji coba koneksi API Key ke Google AI...', 'info', 'Menguji Key', 2000);
+            const res = await fetch(`/api/v1/gui/gemini-keys/${id}/test`, { method: 'POST' });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              this.notify(data.message, 'success', 'Key Terhubung');
+            } else {
+              this.notify(data.message, 'error', 'Key Gagal');
+            }
+            await this.fetchGeminiKeys();
+          } catch (e) {
+            this.notify('Error: ' + e, 'error', 'Uji Coba Gagal');
+          }
+        },
+
         async triggerBrowserLogin() {
           const ok = await this.confirmDialog({
             title: 'Buka Browser Stockbit',
@@ -1865,6 +2178,118 @@
             }
           } catch (e) {
             this.notify('Error: ' + e, 'error', 'Browser Error');
+          }
+        },
+
+        openExportSessionModal() {
+          this.exportSessionModal.open = true;
+          this.exportSessionModal.passphrase = '';
+          this.exportSessionModal.loading = false;
+        },
+
+        async doExportSession() {
+          try {
+            this.exportSessionModal.loading = true;
+            const res = await fetch('/api/v1/session/export', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ passphrase: this.exportSessionModal.passphrase || null })
+            });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (!data.success) {
+              this.notify(data.message || 'Gagal mengekspor sesi Stockbit.', 'error', 'Ekspor Gagal');
+              return;
+            }
+            const blob = new Blob([JSON.stringify(data.package, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename || 'stockbit_session.alugara';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            this.notify(data.message || 'File sesi berhasil diunduh!', 'success', 'Sesi Diekspor');
+            this.exportSessionModal.open = false;
+          } catch (e) {
+            this.notify('Error ekspor sesi: ' + e, 'error', 'Ekspor Gagal');
+          } finally {
+            this.exportSessionModal.loading = false;
+          }
+        },
+
+        openImportSessionModal() {
+          this.importSessionModal.open = true;
+          this.importSessionModal.passphrase = '';
+          this.importSessionModal.filename = '';
+          this.importSessionModal.content = null;
+          this.importSessionModal.loading = false;
+          const fileInput = document.getElementById('sessionFileInput');
+          if (fileInput) fileInput.value = '';
+        },
+
+        onSessionFileSelected(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+          this.importSessionModal.filename = file.name;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            try {
+              this.importSessionModal.content = JSON.parse(e.target.result);
+            } catch (err) {
+              this.notify('Format file bukan paket JSON valid!', 'error', 'File Rusak');
+              this.importSessionModal.content = null;
+            }
+          };
+          reader.readAsText(file);
+        },
+
+        async doImportSession() {
+          if (!this.importSessionModal.content) {
+            this.notify('Silakan pilih file paket sesi (.alugara) terlebih dahulu!', 'warning', 'Pilih File');
+            return;
+          }
+          try {
+            this.importSessionModal.loading = true;
+            const res = await fetch('/api/v1/session/import', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                package: this.importSessionModal.content,
+                passphrase: this.importSessionModal.passphrase || null
+              })
+            });
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.success) {
+              this.notify(data.message, 'success', 'Sesi Berhasil Dipasang');
+              this.importSessionModal.open = false;
+              await this.fetchStatus();
+            } else {
+              this.notify(data.message || 'Gagal mengimpor sesi', 'error', 'Impor Gagal');
+            }
+          } catch (e) {
+            this.notify('Error impor sesi: ' + e, 'error', 'Impor Gagal');
+          } finally {
+            this.importSessionModal.loading = false;
+          }
+        },
+
+        async checkSessionNow() {
+          try {
+            this.notify('Memeriksa status sesi Stockbit ke server...', 'info', 'Cek Sesi', 2000);
+            const res = await fetch('/api/v1/session/status');
+            if (res.status === 401) { this.auth.is_authenticated = false; return; }
+            const data = await res.json();
+            if (data.is_authenticated) {
+              this.notify(data.message || 'Sesi Stockbit aktif & siap!', 'success', 'Stockbit Terhubung');
+            } else {
+              this.notify(data.message || 'Sesi tidak aktif / belum terhubung.', 'warning', 'Belum Login');
+            }
+            await this.fetchStatus();
+          } catch (e) {
+            this.notify('Gagal mengecek sesi: ' + e, 'error', 'Cek Sesi Gagal');
           }
         },
 

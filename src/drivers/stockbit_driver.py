@@ -7,6 +7,13 @@ from loguru import logger
 from playwright.async_api import async_playwright, BrowserContext, Page
 from src.config.settings import settings
 from src.core.models import OrderResult
+from src.storage.db import get_setting, set_setting
+from src.core.security import (
+    encrypt_value,
+    decrypt_value,
+    create_session_export_package,
+    decrypt_session_export_package
+)
 
 class StockbitDriver:
     """
@@ -54,24 +61,48 @@ class StockbitDriver:
             Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
         """)
 
+        # Muat otomatis cookie dari stockbit_state.json jika file sesi tersedia
+        if os.path.exists(self.state_file):
+            try:
+                with open(self.state_file, "r", encoding="utf-8") as sf:
+                    state_data = json.load(sf)
+                    cookies = state_data.get("cookies", [])
+                    if cookies:
+                        await context.add_cookies(cookies)
+                        logger.debug(f"Berhasil memuat {len(cookies)} cookies dari {self.state_file}")
+            except Exception as e:
+                logger.warning(f"Gagal memuat cookies dari {self.state_file}: {e}")
+
         return context
 
     async def check_session_valid(self) -> Tuple[bool, str]:
         """
         Memeriksa apakah sesi login Stockbit saat ini masih aktif dan valid
         """
-        # 1. Cek apakah file sesi stockbit_state.json sudah ada
+        # 1. Cek apakah file sesi stockbit_state.json sudah ada, jika belum coba pulihkan dari DB
         if not os.path.exists(self.state_file):
-            return False, "Belum login. Silakan klik 'Hubungkan / Login Stockbit' di Pengaturan."
+            enc_db = get_setting("stockbit_encrypted_session")
+            if enc_db:
+                try:
+                    raw_state = decrypt_value(enc_db)
+                    if raw_state and "cookies" in raw_state:
+                        with open(self.state_file, "w", encoding="utf-8") as sf:
+                            sf.write(raw_state)
+                        logger.info("Berhasil memulihkan session state Stockbit dari database!")
+                except Exception as ex:
+                    logger.warning(f"Gagal memulihkan sesi dari DB: {ex}")
+
+        if not os.path.exists(self.state_file):
+            return False, "Belum login. Silakan hubungkan akun via browser atau impor sesi."
 
         try:
             with open(self.state_file, "r", encoding="utf-8") as sf:
                 state_data = json.load(sf)
                 cookies = state_data.get("cookies", [])
                 if not cookies:
-                    return False, "File sesi kosong. Silakan login ulang."
+                    return False, "File sesi kosong. Silakan login atau impor ulang."
         except Exception:
-            return False, "File sesi tidak valid. Silakan login ulang."
+            return False, "File sesi tidak valid. Silakan login atau impor ulang."
 
         # 2. Buka browser dan verifikasi login nyata di Stockbit
         async with async_playwright() as p:
@@ -85,7 +116,7 @@ class StockbitDriver:
                 current_url = page.url
                 if "login" in current_url.lower() or "signin" in current_url.lower():
                     await context.close()
-                    return False, "Sesi login kedaluwarsa. Silakan login ulang."
+                    return False, "Sesi login kedaluwarsa. Silakan login atau impor ulang sesi."
 
                 # Cek elemen profil user terautentikasi
                 is_logged_in = await page.evaluate("""
@@ -108,10 +139,66 @@ class StockbitDriver:
                 logger.error(f"Error checking session: {e}")
                 return False, f"Gagal mengecek sesi: {str(e)}"
 
+    def export_session_package(self, passphrase: Optional[str] = None) -> Tuple[bool, Optional[dict], str]:
+        """
+        Mengekspor sesi Stockbit saat ini ke dalam paket terenkripsi AES-256.
+        Mencoba membaca dari sessions/stockbit_state.json atau fallback dari database.
+        """
+        raw_json = None
+        if os.path.exists(self.state_file):
+            try:
+                with open(self.state_file, "r", encoding="utf-8") as f:
+                    raw_json = f.read()
+            except Exception as e:
+                logger.error(f"Gagal membaca file sesi: {e}")
+
+        if not raw_json:
+            enc_db = get_setting("stockbit_encrypted_session")
+            if enc_db:
+                raw_json = decrypt_value(enc_db)
+
+        if not raw_json:
+            return False, None, "Tidak ada data sesi Stockbit aktif yang ditemukan. Silakan login terlebih dahulu."
+
+        try:
+            parsed = json.loads(raw_json)
+            cookies = parsed.get("cookies", [])
+            if not cookies:
+                return False, None, "Data sesi kosong (tidak mengandung cookies)."
+
+            package = create_session_export_package(raw_json, passphrase=passphrase)
+            return True, package, f"Sesi Stockbit ({len(cookies)} cookies) berhasil diekspor."
+        except Exception as e:
+            return False, None, f"Gagal mengekspor sesi: {str(e)}"
+
+    def import_session_package(self, package_data: dict, passphrase: Optional[str] = None) -> Tuple[bool, str]:
+        """
+        Mengimpor paket sesi terenkripsi, mendekripsi, memvalidasi cookies,
+        lalu menyimpan ke sessions/stockbit_state.json dan mencadangkan ke database.
+        """
+        try:
+            raw_json = decrypt_session_export_package(package_data, passphrase=passphrase)
+            parsed = json.loads(raw_json)
+            cookies = parsed.get("cookies", [])
+            if not cookies:
+                return False, "Sesi yang didekripsi tidak mengandung cookies autentikasi yang valid."
+
+            # Tulis ke file sessions/stockbit_state.json
+            with open(self.state_file, "w", encoding="utf-8") as f:
+                f.write(raw_json)
+
+            # Cadangkan terenkripsi ke database
+            set_setting("stockbit_encrypted_session", encrypt_value(raw_json))
+            logger.info(f"Berhasil mengimpor sesi Stockbit dengan {len(cookies)} cookies!")
+            return True, f"Sesi Stockbit berhasil dipasang ({len(cookies)} cookies aktif) & dicadangkan ke database."
+        except Exception as e:
+            logger.error(f"Gagal mengimpor sesi: {e}")
+            return False, str(e)
+
     async def interactive_login(self):
         """
         Membuka browser interaktif (GUI) agar pengguna dapat login 1x dan input OTP.
-        Sesi akan otomatis disimpan secara permanen di sessions/.
+        Sesi akan otomatis disimpan secara permanen di sessions/ dan dicadangkan ke DB.
         """
         logger.info("Membuka browser untuk Interactive Login Stockbit...")
         print("\n========================================================")
@@ -136,8 +223,18 @@ class StockbitDriver:
                     # Check if storage state can be captured
                     await asyncio.sleep(3)
                     await context.storage_state(path=self.state_file)
+                    
+                    # Simpan juga cadangan sesi terenkripsi ke database
+                    try:
+                        with open(self.state_file, "r", encoding="utf-8") as sf:
+                            raw_state = sf.read()
+                            set_setting("stockbit_encrypted_session", encrypt_value(raw_state))
+                            logger.info("Berhasil mencadangkan sesi Stockbit terenkripsi ke database!")
+                    except Exception as ex:
+                        logger.warning(f"Gagal mencadangkan sesi ke DB: {ex}")
+
                     logger.info("Berhasil menyimpan session state Stockbit!")
-                    print("\n✅ LOGIN BERHASIL! Sesi telah disimpan di sessions/stockbit_state.json.")
+                    print("\n✅ LOGIN BERHASIL! Sesi telah disimpan di sessions/stockbit_state.json dan database.")
                     await context.close()
                     return True
 

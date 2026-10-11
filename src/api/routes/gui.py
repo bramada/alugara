@@ -17,7 +17,11 @@ from src.storage.db import (
     set_setting,
     get_active_positions,
     get_trade_logs,
-    get_top_ai_memories
+    get_top_ai_memories,
+    add_gemini_api_key,
+    get_gemini_api_keys,
+    delete_gemini_api_key,
+    toggle_gemini_api_key
 )
 from src.drivers.stockbit_driver import StockbitDriver
 from src.core.execution_engine import ExecutionEngine
@@ -115,6 +119,7 @@ async def get_gui_dashboard_status(background_tasks: BackgroundTasks):
         "recent_trades": logs,
         "ai_memories": ai_memories,
         "screener_signals": signals,
+        "gemini_keys": get_gemini_api_keys(),
         "settings": {
             "trading_pin": "****" if stored_pin else "",
             "gemini_api_key": stored_gemini or "",
@@ -142,6 +147,10 @@ async def update_gui_settings(payload: GuiSettingsPayload):
     if payload.gemini_api_key is not None and payload.gemini_api_key != "":
         set_setting("gemini_api_key", encrypt_value(payload.gemini_api_key))
         settings.GEMINI_API_KEY = payload.gemini_api_key
+        try:
+            add_gemini_api_key(payload.gemini_api_key, "Key Utama")
+        except Exception:
+            pass
 
     if payload.gemini_model is not None:
         set_setting("gemini_model", payload.gemini_model)
@@ -202,6 +211,71 @@ async def test_gemini_api(payload: Optional[TestGeminiPayload] = None):
 
     success, message = await ai_analyzer.test_connection(api_key=active_key, model=active_model)
     return {"success": success, "message": message}
+
+# Gemini Multi-API Key Pool Endpoints
+class AddGeminiKeyPayload(BaseModel):
+    api_key: str
+    label: Optional[str] = ""
+
+@router.get("/gemini-keys")
+async def list_gemini_keys():
+    """Mengambil daftar seluruh Gemini API Key di pool (dengan masking untuk keamanan)"""
+    keys = get_gemini_api_keys()
+    return {"success": True, "keys": keys}
+
+@router.post("/gemini-keys")
+async def create_gemini_key(payload: AddGeminiKeyPayload):
+    """Menambahkan Gemini API Key baru ke pool sistem"""
+    key_clean = payload.api_key.strip()
+    if not key_clean:
+        raise HTTPException(status_code=400, detail="API Key tidak boleh kosong.")
+    
+    # Tes validitas koneksi secara cepat
+    test_ok, test_msg = await ai_analyzer.test_connection(api_key=key_clean)
+    if not test_ok and "Ditolak Google" in test_msg:
+        return {"success": False, "message": f"Google menolak API Key: {test_msg}"}
+
+    try:
+        new_item = add_gemini_api_key(key_clean, payload.label or "")
+        msg = f"API Key '{new_item['label']}' berhasil ditambahkan ke pool Alugara!"
+        if not test_ok:
+            msg += " (Peringatan: Server Google sedang antre/timeout, namun key tetap disimpan)."
+        return {
+            "success": True,
+            "message": msg,
+            "key": new_item
+        }
+    except ValueError as ve:
+        return {"success": False, "message": str(ve)}
+    except Exception as e:
+        return {"success": False, "message": f"Gagal menyimpan API Key: {e}"}
+
+@router.delete("/gemini-keys/{key_id}")
+async def remove_gemini_key(key_id: int):
+    """Menghapus API Key tertentu dari pool"""
+    success = delete_gemini_api_key(key_id)
+    if success:
+        return {"success": True, "message": "API Key berhasil dihapus dari pool."}
+    return {"success": False, "message": "API Key tidak ditemukan."}
+
+@router.patch("/gemini-keys/{key_id}/toggle")
+async def toggle_gemini_key_status(key_id: int):
+    """Mengaktifkan atau menonaktifkan status API Key tertentu"""
+    success = toggle_gemini_api_key(key_id)
+    if success:
+        return {"success": True, "message": "Status API Key berhasil diubah."}
+    return {"success": False, "message": "Gagal mengubah status API Key."}
+
+@router.post("/gemini-keys/{key_id}/test")
+async def test_specific_gemini_key(key_id: int):
+    """Menguji coba satu API Key spesifik dari pool"""
+    all_keys = get_gemini_api_keys(decrypt=True)
+    target = next((k for k in all_keys if k["id"] == key_id), None)
+    if not target or not target.get("api_key"):
+        return {"success": False, "message": "API Key tidak ditemukan."}
+    
+    ok, msg = await ai_analyzer.test_connection(api_key=target["api_key"])
+    return {"success": ok, "message": msg}
 
 @router.post("/trigger-login")
 async def trigger_browser_login(background_tasks: BackgroundTasks):

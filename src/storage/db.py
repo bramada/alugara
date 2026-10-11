@@ -131,6 +131,34 @@ def init_db():
     )
     """)
 
+    # Table 8: Multi-Key Gemini API Pool
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS gemini_api_keys (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        api_key TEXT NOT NULL UNIQUE,
+        label TEXT DEFAULT '',
+        is_active INTEGER DEFAULT 1,
+        error_count INTEGER DEFAULT 0,
+        last_used_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+    """)
+
+    # Auto-migrate legacy gemini_api_key jika tabel gemini_api_keys masih kosong
+    try:
+        cursor.execute("SELECT COUNT(*) FROM gemini_api_keys")
+        cnt = cursor.fetchone()[0]
+        if cnt == 0:
+            cursor.execute("SELECT value FROM app_settings WHERE key = 'gemini_api_key'")
+            row = cursor.fetchone()
+            if row and row['value']:
+                cursor.execute("""
+                INSERT OR IGNORE INTO gemini_api_keys (api_key, label, is_active)
+                VALUES (?, 'Key Utama', 1)
+                """, (row['value'],))
+    except Exception:
+        pass
+
     conn.commit()
     conn.close()
 
@@ -481,3 +509,118 @@ def clear_discuss_history():
     cursor.execute("DELETE FROM ai_discuss_messages")
     conn.commit()
     conn.close()
+
+# Gemini Multi-API Key Pool Helpers
+def add_gemini_api_key(api_key: str, label: str = "") -> Dict[str, Any]:
+    from src.core.security import encrypt_value, decrypt_value
+    clean_key = api_key.strip()
+    if not clean_key:
+        raise ValueError("API Key tidak boleh kosong.")
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    # Periksa apakah key sudah ada (bandingkan plain text yang didekripsi)
+    cursor.execute("SELECT id, api_key FROM gemini_api_keys")
+    rows = cursor.fetchall()
+    for r in rows:
+        existing_plain = decrypt_value(r['api_key'])
+        if existing_plain == clean_key:
+            conn.close()
+            raise ValueError("API Key ini sudah terdaftar dalam sistem.")
+
+    enc_key = encrypt_value(clean_key)
+    lbl = label.strip() or f"Gemini Key #{len(rows) + 1}"
+    cursor.execute("""
+    INSERT INTO gemini_api_keys (api_key, label, is_active)
+    VALUES (?, ?, 1)
+    """, (enc_key, lbl))
+    new_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return {"id": new_id, "label": lbl, "is_active": True}
+
+def get_gemini_api_keys(active_only: bool = False, decrypt: bool = False) -> List[Dict[str, Any]]:
+    from src.core.security import decrypt_value
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    query = "SELECT * FROM gemini_api_keys"
+    if active_only:
+        query += " WHERE is_active = 1"
+    query += " ORDER BY id ASC"
+    cursor.execute(query)
+    rows = cursor.fetchall()
+    conn.close()
+
+    result = []
+    for r in rows:
+        raw_key = r['api_key']
+        plain = decrypt_value(raw_key) if raw_key else ""
+        masked = ""
+        if plain:
+            masked = plain[:8] + "..." + plain[-4:] if len(plain) > 12 else "AIzaSy...****"
+        
+        item = {
+            "id": r['id'],
+            "label": r['label'] or f"Key #{r['id']}",
+            "is_active": bool(r['is_active']),
+            "error_count": r['error_count'] or 0,
+            "last_used_at": r['last_used_at'],
+            "created_at": r['created_at'],
+            "key_masked": masked
+        }
+        if decrypt:
+            item["api_key"] = plain
+        result.append(item)
+    return result
+
+def delete_gemini_api_key(key_id: int) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM gemini_api_keys WHERE id = ?", (key_id,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
+
+def toggle_gemini_api_key(key_id: int, is_active: Optional[bool] = None) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if is_active is None:
+        cursor.execute("UPDATE gemini_api_keys SET is_active = CASE WHEN is_active = 1 THEN 0 ELSE 1 END WHERE id = ?", (key_id,))
+    else:
+        cursor.execute("UPDATE gemini_api_keys SET is_active = ? WHERE id = ?", (1 if is_active else 0, key_id))
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+def record_gemini_key_usage(api_key: str, is_success: bool = True):
+    from src.core.security import decrypt_value
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_iso = datetime.now(timezone.utc).isoformat()
+    try:
+        cursor.execute("SELECT id, api_key, error_count FROM gemini_api_keys")
+        rows = cursor.fetchall()
+        target_id = None
+        current_err = 0
+        for r in rows:
+            if decrypt_value(r['api_key']) == api_key:
+                target_id = r['id']
+                current_err = r['error_count'] or 0
+                break
+        
+        if target_id:
+            new_err = 0 if is_success else (current_err + 1)
+            cursor.execute("""
+            UPDATE gemini_api_keys 
+            SET last_used_at = ?, error_count = ?
+            WHERE id = ?
+            """, (now_iso, new_err, target_id))
+            conn.commit()
+    except Exception as e:
+        print(f"Error updating key usage: {e}")
+    finally:
+        conn.close()
+

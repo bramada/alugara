@@ -42,10 +42,10 @@ class MarketScheduler:
             return sesi1 or sesi2
 
     def start(self):
-        # 1. Siklus Intraday Auto-Trade Berjalan Setiap 3 Menit selama jam kerja bursa (09:00 - 15:59 WIB, Senin-Jumat)
+        # 1. Siklus Intraday Auto-Trade Berjalan Setiap 15 Menit selama jam kerja bursa (09:00 - 15:59 WIB, Senin-Jumat)
         self.scheduler.add_job(
             self.intraday_market_tick,
-            CronTrigger(day_of_week="mon-fri", hour="9-15", minute="*/3", timezone=self.tz),
+            CronTrigger(day_of_week="mon-fri", hour="9-15", minute="*/15", timezone=self.tz),
             id="intraday_tick_loop",
             name="Intraday Auto-Trade Scanner & Execution Loop",
             replace_existing=True
